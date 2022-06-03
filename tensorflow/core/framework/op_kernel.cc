@@ -22,6 +22,7 @@ limitations under the License.
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <chrono>
 
 #include "absl/base/call_once.h"
 #include "absl/strings/match.h"
@@ -1291,6 +1292,9 @@ Status FindKernelRegistration(
     const NodeDef_ExperimentalDebugInfo& experimental_debug_info,
     StringPiece node_op, AttrSlice node_attrs, const KernelRegistration** reg,
     bool* was_attr_mismatch) {
+
+  auto start = std::chrono::steady_clock::now();
+
   *reg = nullptr;
   *was_attr_mismatch = false;
 
@@ -1361,7 +1365,11 @@ Status FindKernelRegistration(
     }
   }
 
-  return OkStatus();
+  auto end = std::chrono::steady_clock::now();
+  std::chrono::duration<double, std::micro> elapsed_micro_seconds = end - start;
+  VLOG(1) << "Find Kernel Registration for node: " << key << ":" << node_name
+          << " takes " << elapsed_micro_seconds.count() << "us\n";
+  return Status::OK();
 }
 
 Status FindKernelRegistration(const DeviceType& device_type,
@@ -1600,6 +1608,9 @@ Status CreateOpKernel(DeviceType device_type, DeviceBase* device,
   bool was_attr_mismatch;
   const KernelRegistration* registration = nullptr;
   Status s;
+
+  auto start = std::chrono::steady_clock::now();
+
   if (props != nullptr) {
     VLOG(1) << "Instantiating kernel for node: " << SummarizeNodeDef(node_def);
 
@@ -1647,6 +1658,12 @@ Status CreateOpKernel(DeviceType device_type, DeviceBase* device,
     delete *kernel;
     *kernel = nullptr;
   }
+
+  auto end = std::chrono::steady_clock::now();
+  std::chrono::duration<double, std::micro> elapsed_micro_seconds = end - start;
+  VLOG(1) << "Instantiating kernel for node: " << SummarizeNodeDef(node_def)
+          << " takes " << elapsed_micro_seconds.count() << "us\n";
+
   return s;
 }
 
