@@ -55,6 +55,8 @@ Status CustomDeviceOpHandler::Execute(ImmediateExecutionOperation* op,
                                       ImmediateExecutionTensorHandle** retvals,
                                       int* num_retvals) {
   tensorflow::CustomDevice* custom_device = nullptr;
+  VLOG(1) << "Execute op " << op->Name() << " in device " << op->DeviceName()
+          << " and op type is " << op->getKind();
 
   TF_RETURN_IF_ERROR(MaybePinToCustomDevice(&custom_device, *op));
 
