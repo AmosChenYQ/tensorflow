@@ -99,6 +99,17 @@ GraphExecutionState::~GraphExecutionState() {
 
   TF_RETURN_IF_ERROR(AddDefaultAttrsToGraphDef(&graph_def, *flib_def, 0));
 
+  VLOG(1)
+      << "place_pruned_graph: "
+      << (options.session_options->config.graph_options().place_pruned_graph()
+              ? "true"
+              : "false");
+  VLOG(1) << "optimize_for_static_graph: "
+          << (options.session_options->config.experimental()
+                      .optimize_for_static_graph()
+                  ? "true"
+                  : "false");
+
   if (options.session_options->config.graph_options().place_pruned_graph() ||
       !options.session_options->config.experimental()
            .optimize_for_static_graph()) {
@@ -681,6 +692,27 @@ Status GraphExecutionState::OptimizeGraph(
       item.fetch.push_back(tensor_connection.from_tensor());
     }
 
+    std::vector<string> callable_options_debug_string;
+    for (const auto& fetch : options.callable_options.fetch()) {
+      callable_options_debug_string.push_back(fetch);
+    }
+    VLOG(1) << "GrapplerItem's fetch of callable_options's fetch: "
+            << absl::StrJoin(callable_options_debug_string, ", ");
+    callable_options_debug_string.clear();
+    for (const auto& target : options.callable_options.target()) {
+      callable_options_debug_string.push_back(target);
+    }
+    VLOG(1) << "GrapplerItem's fetch of callable_options's target: "
+            << absl::StrJoin(callable_options_debug_string, ", ");
+    callable_options_debug_string.clear();
+    for (const auto& tensor_connection :
+         options.callable_options.tensor_connection()) {
+      callable_options_debug_string.push_back(tensor_connection.from_tensor());
+    }
+    VLOG(1) << "GrapplerItem's fetch of tensor_connection's from_tensor: "
+            << absl::StrJoin(callable_options_debug_string, ", ");
+    callable_options_debug_string.clear();
+
     // Add feeds to the GrapplerItem if we know them.
     absl::flat_hash_set<absl::string_view> node_names;
     if (!(options.callable_options.feed().empty() &&
@@ -689,11 +721,19 @@ Status GraphExecutionState::OptimizeGraph(
 
       for (const string& feed : options.callable_options.feed()) {
         feeds.emplace_back(ParseTensorName(feed));
+        callable_options_debug_string.push_back(feed);
       }
+      VLOG(1) << "GrapplerItem's fetch of callable_options's feed: "
+              << absl::StrJoin(callable_options_debug_string, ", ");
+      callable_options_debug_string.clear();
       for (const TensorConnection& tensor_connection :
            options.callable_options.tensor_connection()) {
         feeds.emplace_back(ParseTensorName(tensor_connection.to_tensor()));
+        callable_options_debug_string.push_back(tensor_connection.to_tensor());
       }
+      VLOG(1) << "GrapplerItem's fetch of tensor_connection's to_tensor: "
+              << absl::StrJoin(callable_options_debug_string, ", ");
+      callable_options_debug_string.clear();
 
       // For feeds with tensor index 0 we try to find the corresponding node in
       // the graph to infer feed data type and shape.
@@ -722,6 +762,7 @@ Status GraphExecutionState::OptimizeGraph(
         if (feed_nodes.find(node->name()) == feed_nodes.end()) continue;
 
         // Try to get the type and shape of the feed node.
+        VLOG(1) << "Try to get type and shape of feed node: " << node->DebugString();
         PartialTensorShape partial_shape;
         DataType type;
         Status st = GetFeedShapeAndTypeFromAttribute(node->def(),

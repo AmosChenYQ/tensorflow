@@ -585,6 +585,8 @@ Status ExecutorState<PropagatorStateType>::ProcessSync(
   Device* device = immutable_state_.params().device;
   const bool is_expensive = kernel_stats_->IsExpensive(item);
 
+  VLOG(3) << "ProcessSync: " << item.DebugString();
+
   if (TF_PREDICT_FALSE(MightTrace(event_collector_, is_expensive))) {
     tracing::ScopedRegion region(tracing::EventCategory::kCompute,
                                  op_kernel->name_view());
@@ -627,6 +629,8 @@ void ExecutorState<PropagatorStateType>::ProcessAsync(
       new AsyncState(params, tagged_node, &item, first_input, stats);
 
   auto done = [this, state, activity_id]() {
+    VLOG(3) << "ProcessAsync: " << item.DebugString();
+
     Device* device = immutable_state_.params().device;
     NodeExecStatsInterface* stats = state->stats;  // Shorthand
     Entry* first_input = state->first_input;       // Shorthand
@@ -1459,6 +1463,10 @@ void ExecutorState<PropagatorStateType>::Finish() {
 }
 
 void ExecutorImpl::RunAsync(const Args& args, DoneCallback done) {
+  VLOG(1) << "Op Order Determinism Required: "
+          << (OpOrderDeterminismRequired() ? "true" : "false")
+          << " Require control flow support: "
+          << (immutable_state_.requires_control_flow_support() ? "true" : "false");
   if (OpOrderDeterminismRequired()) {
     (new ExecutorState<OrderedPropagatorState>(args, immutable_state_,
                                                &kernel_stats_))

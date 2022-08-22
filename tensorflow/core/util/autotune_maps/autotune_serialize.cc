@@ -155,6 +155,7 @@ Status PopulateConvMap(
       entry = AutotuneEntry<Op>(primary, fallback);
 #endif
 
+      VLOG(1) << "Insert autotune map in serialize function";
       autotune_map->Insert(ConvParameters(device_id, params_proto), entry);
     }
   }

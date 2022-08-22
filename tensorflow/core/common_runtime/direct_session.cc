@@ -17,6 +17,9 @@ limitations under the License.
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -79,6 +82,7 @@ limitations under the License.
 #include "tensorflow/core/profiler/lib/device_profiler_session.h"
 #include "tensorflow/core/profiler/lib/traceme_encode.h"
 #include "tensorflow/core/protobuf/config.pb.h"
+#include "tensorflow/core/util/autotune_maps/autotune_serialize.h"
 #include "tensorflow/core/util/device_name_utils.h"
 #include "tensorflow/core/util/env_var.h"
 
@@ -357,6 +361,7 @@ DirectSession::DirectSession(const SessionOptions& options,
   }
   session_handle_ =
       strings::StrCat("direct", strings::FpToString(random::New64()));
+  VLOG(1) << "Direct session handle is " << session_handle_;
   int devices_added = 0;
   if (options.config.log_device_placement()) {
     const string mapping_str = device_mgr_->DeviceMappingString();
@@ -438,12 +443,57 @@ Status DirectSession::ExtendLocked(GraphDef&& graph) {
     return errors::FailedPrecondition("Session has been finalized.");
   }
   if (!(flib_def_ && execution_state_)) {
+    VLOG(1) << "Extend graph first time";
     // If this is the first call, we can initialize the execution state
     // with `graph` and do not need to call `Extend()`.
     GraphExecutionStateOptions options;
     options.device_set = &device_set_;
     options.session_options = &options_;
     options.session_handle = session_handle_;
+
+    std::vector<string> devices_info;
+    devices_info.reserve(device_set_.devices().size());
+    for (const auto& device_ptr : device_set_.devices()) {
+      devices_info.push_back(device_ptr->name());
+    }
+    VLOG(1) << "Devices info: " << absl::StrJoin(devices_info, " ");
+
+    string graph_def_debug_info;
+    ::tensorflow::protobuf::TextFormat::PrintToString(graph,
+                                                      &graph_def_debug_info);
+    VLOG(1) << "GraphDef info:";
+    VLOG(1) << graph_def_debug_info;
+
+    string session_options_config_debug_info;
+    ::tensorflow::protobuf::TextFormat::PrintToString(
+        options.session_options->config, &session_options_config_debug_info);
+    VLOG(1) << "GraphExecutionStateOptions's SessionOptions ConfigProto info:";
+    VLOG(1) << session_options_config_debug_info;
+
+    const char* tf_serialize_autotune_map_file =
+        std::getenv("TF_IMPORT_SERIALIZE_AUTOTUNE_MAP_FILE");
+    if (tf_serialize_autotune_map_file) {
+      auto read_file_start = std::chrono::steady_clock::now();
+      std::ifstream inputfile(tf_serialize_autotune_map_file);
+      std::ostringstream file_content_buf;
+      string file_content;
+      if (!inputfile) {
+        VLOG(1) << "Will not import serialize autotune map because importing "
+                   "file failed";
+      }
+      file_content_buf << inputfile.rdbuf();
+      file_content = file_content_buf.str();
+      LoadSerializedAutotuneMaps(file_content);
+      auto read_file_end = std::chrono::steady_clock::now();
+      std::chrono::duration<double, std::milli> read_file_duration =
+          read_file_end - read_file_start;
+      VLOG(1) << "Reading serialized file content"
+              << " takes " << read_file_duration.count() << "ms";
+    } else {
+      VLOG(1) << "Will not import serialize autotune map because "
+                 "TF_IMPORT_SERIALIZE_AUTOTUNE_MAP_FILE is not setted";
+    }
+
     TF_RETURN_IF_ERROR(GraphExecutionState::MakeForBaseGraph(
         std::move(graph), options, &execution_state_));
     // NOTE(mrry): The function library created here will be used for
@@ -454,6 +504,7 @@ Status DirectSession::ExtendLocked(GraphDef&& graph) {
         new FunctionLibraryDefinition(execution_state_->flib_def()));
     graph_created_ = true;
   } else {
+    VLOG(1) << "Extend graph second time or more";
     std::unique_ptr<GraphExecutionState> state;
     // TODO(mrry): Rewrite GraphExecutionState::Extend() to take `graph` by
     // value and move `graph` in here.
@@ -582,6 +633,15 @@ Status DirectSession::RunInternal(
   const bool inline_execution_requested =
       run_in_caller_thread_ || run_options.inter_op_thread_pool() == -1;
 
+  VLOG(3) << "inline execution requested: "
+          << (inline_execution_requested ? "true" : "false")
+          << " inter_op_threadpool is null: "
+          << (threadpool_options.inter_op_threadpool == nullptr ? "true"
+                                                                : "false");
+  VLOG(3) << "setting of inter op thread pool size is: "
+          << run_options.inter_op_thread_pool()
+          << " thread pool size is: " << thread_pools_.size();
+
   if (inline_execution_requested) {
     // We allow using the caller thread only when having a single executor
     // specified.
@@ -630,6 +690,10 @@ Status DirectSession::RunInternal(
   auto* handler_ptr = handler.get();
 
   Executor::Args::Runner default_runner = nullptr;
+
+  VLOG(3) << "thread pool is null: " << (pool == nullptr ? "true" : "false")
+          << " run handler is null: "
+          << (handler_ptr == nullptr ? "true" : "false");
 
   if (pool == nullptr) {
     default_runner = [](const Executor::Args::Closure& c) { c(); };
@@ -684,6 +748,15 @@ Status DirectSession::RunInternal(
           ((measure_step_count + 1) % build_cost_model_every == 0);
     }
   }
+
+  VLOG(3) << "do trace: " << (do_trace ? "true" : "false");
+  VLOG(3) << "update cost model: " << (update_cost_model ? "true" : "false");
+  VLOG(3) << "report tensor allocations upon oom: "
+          << (run_options.report_tensor_allocations_upon_oom() ? "true"
+                                                               : "false");
+  VLOG(3) << "can execute synchronously: "
+          << (can_execute_synchronously ? "true" : "fase");
+
   if (do_trace || update_cost_model ||
       run_options.report_tensor_allocations_upon_oom()) {
     run_state.collector.reset(
@@ -754,6 +827,7 @@ Status DirectSession::RunInternal(
                               executors_done.Notify();
                             });
 
+    VLOG(1) << "The number of executors: " << executors_and_keys->items.size();
     for (const auto& item : executors_and_keys->items) {
       set_threadpool_args_for_item(item, &args);
       item.executor->RunAsync(args, barrier->Get());
@@ -850,6 +924,7 @@ Status DirectSession::Run(const RunOptions& run_options,
                           std::vector<Tensor>* outputs,
                           RunMetadata* run_metadata,
                           const thread::ThreadPoolOptions& threadpool_options) {
+  auto session_run_start = std::chrono::steady_clock::now();
   TF_RETURN_IF_ERROR(CheckNotClosed());
   TF_RETURN_IF_ERROR(CheckGraphCreated("Run()"));
   direct_session_runs->GetCell()->IncrementBy(1);
@@ -870,9 +945,15 @@ Status DirectSession::Run(const RunOptions& run_options,
   run_state_args.collective_graph_key =
       run_options.experimental().collective_graph_key();
 
+  auto get_executor_start = std::chrono::steady_clock::now();
   TF_RETURN_IF_ERROR(GetOrCreateExecutors(input_tensor_names, output_names,
                                           target_nodes, &executors_and_keys,
                                           &run_state_args));
+  auto get_executor_end = std::chrono::steady_clock::now();
+  std::chrono::duration<double, std::milli> get_executor_duration =
+      get_executor_end - get_executor_start;
+  VLOG(1) << "Creating or getting executors"
+          << " takes " << get_executor_duration.count() << "ms";
   {
     mutex_lock l(collective_graph_key_lock_);
     collective_graph_key_ = executors_and_keys->collective_graph_key;
@@ -907,9 +988,15 @@ Status DirectSession::Run(const RunOptions& run_options,
     LogMemory::RecordStep(step_id, run_state_args.handle);
   }
 
+  auto session_run_internal_start = std::chrono::steady_clock::now();
   TF_RETURN_IF_ERROR(RunInternal(step_id, run_options, &call_frame,
                                  executors_and_keys, run_metadata,
                                  threadpool_options));
+  auto session_run_internal_end = std::chrono::steady_clock::now();
+  std::chrono::duration<double, std::milli> internal_elapsed_milli_seconds =
+      session_run_internal_end - session_run_internal_start;
+  VLOG(3) << "Internal session run " << direct_session_runs->GetCell()->value()
+          << internal_elapsed_milli_seconds.count() << "ms";
 
   // Receive outputs.
   if (outputs) {
@@ -951,6 +1038,11 @@ Status DirectSession::Run(const RunOptions& run_options,
     metrics::RecordGraphOutputTensors(output_size);
   }
 
+  auto session_run_end = std::chrono::steady_clock::now();
+  std::chrono::duration<double, std::milli> session_run_elapsed_milli_seconds =
+      session_run_end - session_run_start;
+  VLOG(1) << "Direct session run " << direct_session_runs->GetCell()->value()
+          << " costs " << session_run_elapsed_milli_seconds.count() << "ms";
   return OkStatus();
 }
 
@@ -1414,8 +1506,14 @@ Status DirectSession::CreateExecutors(
         delete kernel;
     };
 
+    auto start = std::chrono::steady_clock::now();
     optimizer.Optimize(lib, options_.env, device, &partition_graph,
                        GraphOptimizer::Options());
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double, std::milli> elapsed_milli_seconds =
+        end - start;
+    VLOG(1) << "optimizer.Optimize"
+            << " takes " << elapsed_milli_seconds.count() << "ms";
 
     // TensorFlow Debugger (tfdbg) inserts debug nodes in the graph.
     const DebugOptions& debug_options =
@@ -1504,6 +1602,8 @@ Status DirectSession::GetOrCreateExecutors(
         strings::StrCat(key, ";", handle_name_counter_value);
   }
 
+  VLOG(1) << "fast look up run_state_args's handle: " << run_state_args->handle;
+
   // See if we already have the executors for this run.
   {
     mutex_lock l(executor_lock_);  // could use reader lock
@@ -1536,6 +1636,8 @@ Status DirectSession::GetOrCreateExecutors(
     run_state_args->handle =
         strings::StrCat(sorted_key, ";", handle_name_counter_value);
   }
+
+  VLOG(1) << "slow look up run_state_args's handle: " << run_state_args->handle;
 
   // See if we already have the executors for this run.
   {
@@ -1607,6 +1709,9 @@ Status DirectSession::CreateGraphs(
 
   std::unique_ptr<GraphExecutionState> temp_exec_state_holder;
   GraphExecutionState* execution_state = nullptr;
+  VLOG(1) << "Session options_'s config in graph_option place_pruned_graph: "
+          << (options_.config.graph_options().place_pruned_graph() ? "true"
+                                                                   : "false");
   if (options_.config.graph_options().place_pruned_graph()) {
     // Because we are placing pruned graphs, we need to create a
     // new GraphExecutionState for every new unseen graph,
@@ -1622,6 +1727,17 @@ Status DirectSession::CreateGraphs(
     execution_state = temp_exec_state_holder.get();
   } else {
     execution_state = execution_state_.get();
+    string callable_options_debug_string;
+    tensorflow::protobuf::TextFormat::PrintToString(
+        subgraph_options.callable_options, &callable_options_debug_string);
+    VLOG(1) << "callable_options is: " << callable_options_debug_string;
+    VLOG(1) << " use_function_convention: "
+            << (subgraph_options.use_function_convention ? "true" : "false")
+            << " collective_graph_key: "
+            << subgraph_options.collective_graph_key << " collective_order: "
+            << (subgraph_options.collective_order == GraphCollectiveOrder::kNone
+                    ? "none"
+                    : "edges or attrs");
     TF_RETURN_IF_ERROR(
         execution_state->BuildGraph(subgraph_options, &client_graph));
   }
@@ -1775,8 +1891,24 @@ Status DirectSession::CreateGraphs(
     mutex_lock l(closed_lock_);
     if (closed_) return OkStatus();
     closed_ = true;
+    const char* tf_serialize_autotune_map_file =
+        std::getenv("TF_EXPORT_SERIALIZE_AUTOTUNE_MAP_FILE");
+    string output_jit_content;
+    const Status status = SerializeAutotuneMaps(&output_jit_content);
+    if (tf_serialize_autotune_map_file && status.ok()) {
+      std::ofstream outfile(tf_serialize_autotune_map_file);
+      outfile << output_jit_content;
+      outfile.close();
+      VLOG(1) << "Serialize autotune map:";
+      VLOG(1) << output_jit_content;
+    } else {
+      VLOG(1) << "Will not export serialize autotune map because "
+                 "TF_EXPORT_SERIALIZE_AUTOTUNE_MAP_FILE is not setted or "
+                 "serialization has problems";
+    }
   }
   if (factory_ != nullptr) factory_->Deregister(this);
+  VLOG(1) << "Direct session is closed";
   return OkStatus();
 }
 
@@ -2037,6 +2169,7 @@ Status DirectSession::Finalize() {
   if (!graph_created_) {
     return errors::FailedPrecondition("Session not yet created.");
   }
+  VLOG(1) << "Direct session will be finalized";
   execution_state_.reset();
   flib_def_.reset();
   finalized_ = true;

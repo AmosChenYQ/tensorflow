@@ -98,7 +98,9 @@ class GraphConstructor {
           importing(false),
           validate_nodes(in.validate_nodes),
           validate_colocation_constraints(false),
-          add_default_attributes(in.add_default_attributes) {}
+          add_default_attributes(in.add_default_attributes) {
+            VLOG(1) << "GraphConstructor's options is created by GraphConstructorOptions";
+          }
     Options(const ImportGraphDefOptions& in)  // NOLINT(runtime/explicit)
         : allow_internal_ops(false),
           expect_device_spec(false),
@@ -116,7 +118,9 @@ class GraphConstructor {
           validate_nodes(true),
           validate_colocation_constraints(in.validate_colocation_constraints),
           validate_shape(in.validate_shape),
-          default_device(in.default_device) {}
+          default_device(in.default_device) {
+            VLOG(1) << "GraphConstructor's options is created by ImportGraphDefOptions";
+          }
 
     bool allow_internal_ops;
     bool expect_device_spec;
@@ -589,7 +593,22 @@ Status GraphConstructor::EnsureNoNameCollisions() {
       }
     }
     AddPrefixes(n->name(), &existing_prefixes_);
+    std::vector<StringPiece> existing_prefixes_debug_str;
+    std::vector<StringPiece> existing_nodes_debug_str;
+    for (const auto& prefix : existing_prefixes_) {
+      existing_prefixes_debug_str.push_back(prefix);
+    }
+    for (const std::pair<StringPiece, Node*>& pair_node : existing_nodes_) {
+      existing_nodes_debug_str.push_back(pair_node.first);
+    }
+    VLOG(1) << "After adding " << n->name() << " existing_nodes_ : "
+            << absl::StrJoin(existing_nodes_debug_str, " | ")
+            << " existing_prefixes_ : "
+            << absl::StrJoin(existing_prefixes_debug_str, " | ");
   }
+  VLOG(1) << "GraphConstructor's prefix: " << prefix_
+          << " importing: " << (opts_.importing ? "true" : "false")
+          << " uniquify_names: " << (opts_.uniquify_names ? "true" : "false");
   if (prefix_.empty() && opts_.importing && !opts_.uniquify_names) {
     for (size_t i = 0; i < node_def_count(); ++i) {
       const string& name = get_node_def(i).name();

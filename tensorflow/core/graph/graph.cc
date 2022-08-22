@@ -510,6 +510,19 @@ Node* Graph::AddNode(NodeDef node_def, Status* status) {
                                    ? Node::NC_FUNCTION_OP
                                    : Node::GetNodeClassForOp(node_def.op());
 
+  std::vector<string> inputs_debug_info;
+  std::vector<string> outputs_debug_info;
+  for (auto input : inputs) {
+    inputs_debug_info.push_back(std::to_string(input));
+  }
+  for (auto output : outputs) {
+    outputs_debug_info.push_back(std::to_string(output));
+  }
+  VLOG(3) << "AddNode: " << node_def.name()
+          << " Inputs: " << absl::StrJoin(inputs_debug_info, " ")
+          << " Outputs: " << absl::StrJoin(outputs_debug_info, " ")
+          << " Node class: " << node_class;
+
   if (node_def.has_experimental_type()) {
     VLOG(3) << "AddNode: node has type set, skipping type constructor "
             << node_def.name();

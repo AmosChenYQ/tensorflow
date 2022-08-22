@@ -20,6 +20,7 @@ limitations under the License.
 
 #include <tuple>
 #include <unordered_map>
+#include <chrono>
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"

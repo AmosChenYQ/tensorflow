@@ -77,7 +77,7 @@ Status OpNotFound(const string& op_type_name) {
       "from tf.contrib, accessing (e.g.) `tf.contrib.resampler` should be done "
       "before importing the graph, as contrib ops are lazily registered when "
       "the module is first accessed.");
-  VLOG(1) << status.ToString();
+  VLOG(3) << status.ToString();
   return status;
 }
 }  // namespace
