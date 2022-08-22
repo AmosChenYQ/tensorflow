@@ -173,10 +173,14 @@ StatusOr<AutotuneEntry<se::dnn::FusedConvOp>> AutotuneFusedConv(
                        side_input_ptr, bias_ptr, output_ptr_rz);
     };
 
+    auto start = std::chrono::steady_clock::now();
     SE_ASSIGN_OR_RETURN(
         auto results,
         AutotuneConvImpl(ctx, runners, cudnn_use_autotune, launch_func,
                          scratch_size_limit, rz_allocator));
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double, std::milli> elapsed_milli_seconds = end - start;
+    VLOG(1) << "Autotune fused conv takes " << elapsed_milli_seconds.count() << "ms";
     // Only log on an AutotuneConv cache miss.
     LogFusedConvForwardAutotuneResults(
         se::dnn::ToDataType<T>::value, input_ptr, filter_ptr, output_ptr,
@@ -213,10 +217,14 @@ StatusOr<AutotuneEntry<se::dnn::FusedConvOp>> AutotuneFusedConv(
           input_desc, filter_desc, bias_desc, output_desc, conv_desc,
           /*use_fallback=*/true, activation_mode, &fallback_runners));
 
+      auto start_fallback = std::chrono::steady_clock::now();
       SE_ASSIGN_OR_RETURN(
           auto fallback_results,
           AutotuneConvImpl(ctx, fallback_runners, cudnn_use_autotune,
                            launch_func, scratch_size_limit, rz_allocator));
+      auto end_fallback = std::chrono::steady_clock::now();
+      auto elapsed_micro_seconds_fallback = end - start;
+      VLOG(1) << "Autotune fused conv in fallback takes " << elapsed_micro_seconds_fallback.count() << "ms";
 
       LogFusedConvForwardAutotuneResults(
           se::dnn::ToDataType<T>::value, input_ptr, filter_ptr, output_ptr,
@@ -229,6 +237,7 @@ StatusOr<AutotuneEntry<se::dnn::FusedConvOp>> AutotuneFusedConv(
                               fallback_results, std::move(fallback_runners)));
     }
 
+    VLOG(1) << "Insert autotune map in autotune fused conv";
     autotune_map->Insert(params, autotune_entry);
   }
   return autotune_entry;
@@ -331,10 +340,15 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
       return (*runner)(stream, profile_result, scratch, input_ptr, filter_ptr,
                        output_ptr);
     };
+
+    auto start = std::chrono::steady_clock::now();
     SE_ASSIGN_OR_RETURN(
         auto results,
         AutotuneConvImpl(ctx, runners, cudnn_use_autotune, launch_func,
                          scratch_size_limit, rz_allocator));
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double, std::milli> elapsed_milli_seconds = end - start;
+    VLOG(1) << "Autotune unfused conv in fallback takes " << elapsed_milli_seconds.count() << "ms";
 
     LogConvAutotuneResults(kind, se::dnn::ToDataType<T>::value, input_ptr,
                            filter_ptr, output_ptr, input_desc, filter_desc,
@@ -436,6 +450,7 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
     autotune_entry = AutotuneEntry<se::dnn::ConvOp>(algo_desc);
 #endif
 
+    VLOG(1) << "Insert autotune map in autotune unfused conv";
     autotune_map->Insert(conv_parameters, autotune_entry);
   }
 

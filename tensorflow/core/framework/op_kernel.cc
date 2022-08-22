@@ -1366,9 +1366,9 @@ Status FindKernelRegistration(
   }
 
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<double, std::micro> elapsed_micro_seconds = end - start;
-  VLOG(1) << "Find Kernel Registration for node: " << key << ":" << node_name
-          << " takes " << elapsed_micro_seconds.count() << "us\n";
+  std::chrono::duration<double, std::milli> elapsed_milli_seconds = end - start;
+  VLOG(3) << "Find Kernel Registration for node: " << key << ":" << node_name
+          << " takes " << elapsed_milli_seconds.count() << "ms";
   return Status::OK();
 }
 
@@ -1612,7 +1612,7 @@ Status CreateOpKernel(DeviceType device_type, DeviceBase* device,
   auto start = std::chrono::steady_clock::now();
 
   if (props != nullptr) {
-    VLOG(1) << "Instantiating kernel for node: " << SummarizeNodeDef(node_def);
+    VLOG(3) << "Instantiating kernel for node: " << SummarizeNodeDef(node_def);
 
     // Validate node_def against OpDef.
     TF_RETURN_IF_ERROR(ValidateNodeDef(node_def, *props->op_def));
@@ -1660,9 +1660,9 @@ Status CreateOpKernel(DeviceType device_type, DeviceBase* device,
   }
 
   auto end = std::chrono::steady_clock::now();
-  std::chrono::duration<double, std::micro> elapsed_micro_seconds = end - start;
-  VLOG(1) << "Instantiating kernel for node: " << SummarizeNodeDef(node_def)
-          << " takes " << elapsed_micro_seconds.count() << "us\n";
+  std::chrono::duration<double, std::milli> elapsed_milli_seconds = end - start;
+  VLOG(3) << "Instantiating kernel for node: " << SummarizeNodeDef(node_def)
+          << " takes " << elapsed_milli_seconds.count() << "ms";
 
   return s;
 }

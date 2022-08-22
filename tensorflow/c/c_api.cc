@@ -351,6 +351,8 @@ bool ExtendSessionGraphHelper(TF_Session* session, TF_Status* status) {
     }
 
     const auto num_nodes = graph.num_node_ids();
+    VLOG(1) << "last num of graph node " << session->last_num_graph_nodes << " "
+            << "this num of graph node " << num_nodes;
     if (session->last_num_graph_nodes < num_nodes) {
       // TODO(nolivia): check this on a subset of the graph instead of all of
       // it.

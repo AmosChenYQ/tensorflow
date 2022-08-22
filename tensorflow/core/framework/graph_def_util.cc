@@ -74,6 +74,12 @@ Status AddDefaultAttrsToGraphDef(GraphDef* graph_def,
     Status s = op_registry.LookUpOpDef(node_def->op(), &op_def);
     if (s.ok()) {
       AddDefaultsToNodeDef(*op_def, node_def);
+      string op_def_debug_info;
+      ::tensorflow::protobuf::TextFormat::PrintToString(*op_def,
+                                                        &op_def_debug_info);
+      VLOG(3) << "Add default attrs to node_def name: " << node_def->name()
+              << " node_def op: " << node_def->op()
+              << " op_def attrs: " << op_def_debug_info;
     } else if (!skip_unknown_ops) {
       return s;
     }

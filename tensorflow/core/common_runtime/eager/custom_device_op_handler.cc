@@ -61,6 +61,7 @@ Status CustomDeviceOpHandler::Execute(ImmediateExecutionOperation* op,
   TF_RETURN_IF_ERROR(MaybePinToCustomDevice(&custom_device, *op));
 
   if (custom_device != nullptr) {
+    VLOG(1) << "Execute op " << op->Name() << " in device " << op->DeviceName();
     return custom_device->Execute(op, retvals, num_retvals);
   }
 

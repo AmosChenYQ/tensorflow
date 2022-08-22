@@ -882,6 +882,10 @@ void TFE_Py_ExecuteCancelable(TFE_Context* ctx, const char* device_name,
   tensorflow::profiler::TraceMe activity(
       "TFE_Py_ExecuteCancelable", tensorflow::profiler::TraceMeLevel::kInfo);
 
+  VLOG(1) << "Eager executes cancelable " << op_name << " on " << device_name
+          << " the number of inputs is " << inputs->size()
+          << " the number of output is " << outputs->size();
+
   TFE_Op* op = GetOp(ctx, op_name, device_name, out_status);
 
   auto cleaner = tensorflow::gtl::MakeCleanup([ctx, op] { ReturnOp(ctx, op); });

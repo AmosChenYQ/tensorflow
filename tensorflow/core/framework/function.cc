@@ -1559,8 +1559,10 @@ Status FunctionLibraryDefinition::LookUp(
   auto iter = function_defs_.find(op);
   if (iter != function_defs_.end()) {
     *op_reg_data = &iter->second->op_registration_data;
+    VLOG(3) << "Look up op name " << op << " in function_defs_ of graph's flib_def";
     return OkStatus();
   }
+  VLOG(3) << "Look up op name " << op << " in default_registry_ of graph's flib_def";
   return default_registry_->LookUp(op, op_reg_data);
 }
 
