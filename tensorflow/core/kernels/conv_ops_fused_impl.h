@@ -564,6 +564,7 @@ struct LaunchFusedConv2DOp<GPUDevice, T> {
     DnnScratchAllocator scratch_allocator(ConvolveScratchSize(), context);
     Status cudnn_launch_status;
     if (!autotune_entry.is_algorithm_config()) {
+      VLOG(1) << "Before lauching fused conv if autotune entry is not algorithm config";
       auto& runners = autotune_entry.GetOpRunners();
       se::dnn::FusedConvOp::Config config{se::dnn::ConvolutionKind::FORWARD,
                                           element_type,
@@ -600,6 +601,7 @@ struct LaunchFusedConv2DOp<GPUDevice, T> {
           stream, nullptr, std::get<se::DeviceMemoryBase>(runner_and_scratch),
           input_ptr, filter_ptr, side_input_ptr, bias_ptr, output_ptr);
     } else {
+      VLOG(1) << "Before lauching fused conv if autotune entry is algorithm config";
       cudnn_launch_status = stream->FusedConvolveWithAlgorithm(
           input_desc, input_ptr,            // input
           kConvScale,                       // input_scale

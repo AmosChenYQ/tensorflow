@@ -1110,6 +1110,7 @@ void LaunchConv2DOp<GPUDevice, T>::operator()(
                                     device_id,                // device_id
                                     conv_desc.group_count()};
 
+  VLOG(1) << "Get entry for unfused conv";
   auto entry_or = AutotuneUnfusedConv(
       cudnn_use_autotune, ConvAutotuneMap::GetInstance(), conv_parameters, ctx,
       se::dnn::ConvolutionKind::FORWARD, input_desc, input_ptr, filter_desc,
@@ -1117,6 +1118,7 @@ void LaunchConv2DOp<GPUDevice, T>::operator()(
   OP_REQUIRES_OK(ctx, entry_or.status());
   auto autotune_entry = entry_or.ConsumeValueOrDie();
 
+  VLOG(1) << "Lauch autotuned unfused conv op";
   DnnScratchAllocator scratch_allocator(ConvolveScratchSize, ctx);
   Status cudnn_launch_status = LaunchAutotunedConv(
       autotune_entry, &scratch_allocator, se::dnn::ConvolutionKind::FORWARD,

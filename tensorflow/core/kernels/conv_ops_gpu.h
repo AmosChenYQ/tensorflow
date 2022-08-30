@@ -170,6 +170,7 @@ Status LaunchAutotunedConv(const AutotuneEntry<se::dnn::ConvOp>& autotune_entry,
                            const se::dnn::BatchDescriptor& output_desc,
                            se::DeviceMemory<T> out_ptr) {
   if (!autotune_entry.is_algorithm_config()) {
+    VLOG(1) << "Before lauching conv if autotune entry is not algorithm config";
     const auto& runners = autotune_entry.GetOpRunners();
     se::dnn::DataType element_type = se::dnn::ToDataType<T>::value;
     se::dnn::ConvOp::Config config{kind,       element_type, element_type,
@@ -193,6 +194,7 @@ Status LaunchAutotunedConv(const AutotuneEntry<se::dnn::ConvOp>& autotune_entry,
                   std::get<se::DeviceMemoryBase>(runner_and_scratch), in_ptr,
                   filter_ptr, out_ptr);
   } else {
+    VLOG(1) << "Before lauching conv if autotune entry is algorithm config";
     return stream->ConvolveWithAlgorithm(
         kind, input_desc, in_ptr, filter_desc, filter_ptr, output_desc, out_ptr,
         conv_desc, scratch_allocator, autotune_entry.GetAlgorithmConfig(),

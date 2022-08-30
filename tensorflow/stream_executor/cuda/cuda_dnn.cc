@@ -3527,7 +3527,7 @@ GetCudnnOperationGraph(dnn::ConvolutionKind kind, dnn::DataType input_type,
                      .build();
   RETURN_MSG_IF_CUDNN_ERROR(opGraph);
 
-  VLOG(4) << "\nTensor_x: " << tensor_x.describe()
+  VLOG(1) << "\nTensor_x: " << tensor_x.describe()
           << "\nTensor_y: " << tensor_y.describe()
           << "\nTensor_w: " << tensor_w.describe()
           << "\nConv: " << conv_desc.describe() << "\nOp: " << op.describe()
@@ -4454,6 +4454,14 @@ port::Status CreateOpRunners(
     dnn::ConvolutionKind kind, dnn::DataType input_type,
     absl::Span<const int64_t> input_uids, bool use_fallback,
     std::vector<std::unique_ptr<const dnn::OpRunner<Sig>>>* out_runners) {
+  VLOG(1) << "Create OpRunners: "
+          << " Enable winograd: "
+          << (CudnnEnvVar<WinogradNonfused>::IsEnabled() ? "true" : "false")
+          << " RequireCudnnDeterminism: "
+          << (RequireCudnnDeterminism() ? "true" : "false")
+          << " Use Tensor Core: "
+          << (IsTensorMathEnabled(stream, input_type) ? "true" : "false")
+          << " Use fallback: " << (use_fallback ? "true" : "false");
   cudnn_frontend::EngineConfigList filtered_configs;
   auto generic_filter_fn = [=](cudnnBackendDescriptor_t engine_config) -> bool {
     return GenericEngineFilter(
@@ -4470,14 +4478,24 @@ port::Status CreateOpRunners(
                           .build();
     RETURN_MSG_IF_CUDNN_ERROR(heuristics);
 
+    // If tensorflow runtime is in infer mode, we force tensorflow runtime
+    // to produce only one op runner to save autotune time.
     // cuDNN frontend sneakily puts error messages on the object and returns
     // partially-initialized results when there's an error; make sure to check
     // them.
+    // TODO(amoschenyq): Remove infer mode logic after determing whether only tune one
+    // runner can work to save autotune time.
     int64_t engine_count = heuristics.getEngineConfigCount();
+
+    const char* tf_debug_infer_mode = std::getenv("TF_DEBUG_INFER_MODE");
+    if(tf_debug_infer_mode) {
+      engine_count = 1;
+    }
+    VLOG(1) << "Engine count is " << engine_count;
     RETURN_MSG_IF_CUDNN_ERROR(heuristics);
     auto& heuristics_configs = heuristics.getEngineConfig(engine_count);
     RETURN_MSG_IF_CUDNN_ERROR(heuristics);
-    VLOG(4) << "\nHeuristics engine configs size: "
+    VLOG(1) << "Heuristics engine configs size: "
             << heuristics_configs.size();
 
     cudnn_frontend::filter(heuristics_configs, filtered_configs,
@@ -4490,12 +4508,12 @@ port::Status CreateOpRunners(
     RETURN_MSG_IF_CUDNN_ERROR(fallback);
 
     auto& fallback_configs = fallback.getFallbackList();
-    VLOG(4) << "\nFallback engine configs size: " << fallback_configs.size();
+    VLOG(1) << "Fallback engine configs size: " << fallback_configs.size();
 
     cudnn_frontend::filter(fallback_configs, filtered_configs,
                            generic_filter_fn);
   }
-  VLOG(4) << "\nFiltered engine configs size: " << filtered_configs.size();
+  VLOG(1) << "Filtered engine configs size: " << filtered_configs.size();
 
   auto fn = []() { return true; };
   auto maybe_json_handle_static = CudnnExecutionPlanEngineFilterStatic();
@@ -4514,13 +4532,13 @@ port::Status CreateOpRunners(
     if (maybe_json_handle_static &&
         cudnn_frontend::check_errata(*maybe_json_handle_static, plan.getTag(),
                                      cudnn.handle(), fn)) {
-      VLOG(4) << "Exclude engine (static): " << plan.getTag();
+      VLOG(1) << "Exclude engine (static): " << plan.getTag();
       continue;
     }
     if (maybe_json_handle_runtime &&
         cudnn_frontend::check_errata(*maybe_json_handle_runtime, plan.getTag(),
                                      cudnn.handle(), fn)) {
-      VLOG(4) << "Exclude engine (runtime): " << plan.getTag();
+      VLOG(1) << "Exclude engine (runtime): " << plan.getTag();
       continue;
     }
 
@@ -4546,7 +4564,7 @@ port::Status CreateOpRunners(
     }
   }
 
-  VLOG(4) << "\nReturned execution plans size: " << out_runners->size();
+  VLOG(1) << "Returned execution plans size: " << out_runners->size();
 
   return port::Status::OK();
 }
@@ -4577,6 +4595,11 @@ port::Status CudnnSupport::GetConvolveRunners(
 
   const bool actually_use_cudnn_frontend =
       use_cudnn_frontend && !is_pre_frontend_cudnn && !is_unsupported_x32;
+
+  VLOG(1) << "Is pre frontend cudnn: "
+          << (is_pre_frontend_cudnn ? "true" : "false")
+          << " Is use cudnn frontend: "
+          << (actually_use_cudnn_frontend ? "true" : "false");
 
   if (use_cudnn_frontend && !actually_use_cudnn_frontend) {
     // This will happen once per unique conv configuration/shape that gets
@@ -4619,6 +4642,7 @@ port::Status CudnnSupport::GetConvolveRunners(
           absl::StrFormat("Listing algorithms failed for kind %d", kind));
     }
 
+    VLOG(1) << "The number of algorithms to generate runners is " << algorithms.size();
     for (const auto& algo : algorithms) {
       auto runner_or = ConvolveRunnerFromDesc(
           stream, algo, kind, input_type, output_type, input_descriptor,
@@ -4643,11 +4667,13 @@ port::Status CudnnSupport::GetConvolveRunners(
 
 #if CUDNN_VERSION >= 8100 && TF_ENABLE_CUDNN_FRONTEND
   auto cudnn = cudnn_->GetHandle(parent_, stream);
+  VLOG(1) << "Create op graph from GetCudnnOperationGraph";
   SE_ASSIGN_OR_RETURN(
       auto op_graph,
       GetCudnnOperationGraph(kind, input_type, output_type, input_descriptor,
                              filter_descriptor, output_descriptor,
                              convolution_descriptor, cudnn));
+  VLOG(1) << "Create op runners from op graph";
 
   return CreateOpRunners<dnn::ConvSignature>(
       stream, cudnn, parent_, cudnn_.get(), std::move(op_graph), kind,
@@ -5009,6 +5035,11 @@ port::Status CudnnSupport::GetFusedConvolveRunners(
   const bool actually_use_cudnn_frontend =
       use_cudnn_frontend && !is_pre_frontend_cudnn &&
       !is_broken_identity_fused_conv && !is_unsupported_x32;
+
+  VLOG(1) << "Is pre frontend cudnn ? "
+          << (is_pre_frontend_cudnn ? "true" : "false")
+          << " Is use cudnn frontend ? "
+          << (actually_use_cudnn_frontend ? "true" : "false");
 
   if (use_cudnn_frontend && !actually_use_cudnn_frontend) {
     const char* reason = "the current cuDNN version does not support it.";
