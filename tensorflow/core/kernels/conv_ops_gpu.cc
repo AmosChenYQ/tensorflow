@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/core/kernels/conv_ops_gpu.h"
 
+#include "absl/types/span.h"
+
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 #include "tensorflow/core/profiler/lib/scoped_annotation.h"
@@ -89,8 +91,10 @@ StatusOr<AutotuneEntry<se::dnn::FusedConvOp>> AutotuneFusedConv(
                             ctx, runners, cudnn_use_autotune, launch_func,
                             scratch_size_limit, rz_allocator));
     auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double, std::milli> elapsed_milli_seconds = end - start;
-    VLOG(1) << "Autotune fused conv takes " << elapsed_milli_seconds.count() << "ms";
+    std::chrono::duration<double, std::milli> elapsed_milli_seconds =
+        end - start;
+    VLOG(1) << "Autotune fused conv takes " << elapsed_milli_seconds.count()
+            << "ms";
     // Only log on an AutotuneConv cache miss.
     LogFusedConvForwardAutotuneResults(
         se::dnn::ToDataType<T>::value, input_ptr, filter_ptr, output_ptr,
@@ -135,7 +139,8 @@ StatusOr<AutotuneEntry<se::dnn::FusedConvOp>> AutotuneFusedConv(
                               launch_func, scratch_size_limit, rz_allocator));
       auto end_fallback = std::chrono::steady_clock::now();
       auto elapsed_micro_seconds_fallback = end - start;
-      VLOG(1) << "Autotune fused conv in fallback takes " << elapsed_micro_seconds_fallback.count() << "ms";
+      VLOG(1) << "Autotune fused conv in fallback takes "
+              << elapsed_micro_seconds_fallback.count() << "ms";
 
       LogFusedConvForwardAutotuneResults(
           se::dnn::ToDataType<T>::value, input_ptr, filter_ptr, output_ptr,
@@ -225,7 +230,39 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
 
   auto* stream = ctx->op_device_context()->stream();
 
+  /*
+  // TODO(amoschenyq): Remove this after determining that missing batch entry
+  // can be inferred from other batch entries available in autotune map
+  // And a specific batch size is set here for debugging
+  const char* tf_debug_cudnn_infer = std::getenv("TF_DEBUG_CUDNN_INFER");
+  if (!autotune_map->Find(conv_parameters, &autotune_entry) &&
+      conv_parameters.proto().batch() == 127 && tf_debug_cudnn_infer) {
+    VLOG(1) << "Begin infer batch size is 127";
+    const absl::Span<const int64_t> in_infer;
+    int device_id = stream->parent()->device_ordinal();
+    // TODO(amoschenyq): Simplify this by adding a member function in class
+    ConParameters ConvParameters conv_parameters_for_infer = {
+        128,
+        conv_parameters.proto().in_depths(),
+        conv_parameters.proto().in(),
+        conv_parameters.proto().data_format(),
+        conv_parameters.proto().out_depths(),
+        conv_parameters.proto().filter(),
+        conv_parameters.proto().dilation(),
+        conv_parameters.proto().stride(),
+        conv_parameters.proto().padding(),
+        conv_parameters.proto().dtype(),
+        device_id,
+        conv_parameters.proto().group_count()};
+    autotune_map->Find(conv_parameters_for_infer, &autotune_entry);
+    VLOG(1) << "Infer autotune_entry result is:" <<
+    autotune_entry.ToString(); return autotune_entry;
+  }
+  */
+
   if (!autotune_map->Find(conv_parameters, &autotune_entry)) {
+    VLOG(1) << "Can not find autotune entry for conv parameters of "
+            << conv_parameters.ToString();
     profiler::ScopedAnnotation annotation("cudnn_autotuning");
 
 #if GOOGLE_CUDA
@@ -239,14 +276,17 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
     switch (kind) {
       case se::dnn::ConvolutionKind::FORWARD:
       case se::dnn::ConvolutionKind::FORWARD_BIAS_ACTIVATION:
+        VLOG(1) << "ConvolutionKind is FORWARD or FORWARD_BIAS_ACTIVATION";
         output_ptr = se::DeviceMemory<T>(
             WrapRedzoneBestEffort(&rz_allocator, output_ptr));
         break;
       case se::dnn::ConvolutionKind::BACKWARD_DATA:
+        VLOG(1) << "ConvolutionKind is BACKWARD_DATA";
         input_ptr = se::DeviceMemory<T>(
             WrapRedzoneBestEffort(&rz_allocator, input_ptr));
         break;
       case se::dnn::ConvolutionKind::BACKWARD_FILTER:
+        VLOG(1) << "ConvolutionKind is BACKWARD_FILTER";
         filter_ptr = se::DeviceMemory<T>(
             WrapRedzoneBestEffort(&rz_allocator, filter_ptr));
         break;
@@ -257,14 +297,22 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
 
     const auto element_type = se::dnn::ToDataType<T>::value;
     std::vector<std::unique_ptr<const se::dnn::ConvRunner>> runners;
+    auto start = std::chrono::steady_clock::now();
     TF_RETURN_IF_ERROR(stream->parent()->GetConvolveRunners(
         CudnnUseFrontend(), kind, element_type, element_type, stream,
         input_desc, input_ptr, filter_desc, filter_ptr, output_desc, output_ptr,
         conv_desc, /*use_fallback=*/false, &rz_allocator, &runners));
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double, std::milli> elapsed_milli_seconds =
+        end - start;
+    VLOG(1) << "Getting unfused conv runners takes "
+            << elapsed_milli_seconds.count() << "ms. "
+            << "The number of runners is " << runners.size() << ".";
     auto launch_func =
         [&](se::ScratchAllocator* allocator_used,
             const std::unique_ptr<const se::dnn::ConvRunner>& runner,
             se::dnn::ProfileResult* profile_result) -> Status {
+      VLOG(1) << "Lauching lambda function for runner " << runner->ToString();
       TF_ASSIGN_OR_RETURN(auto scratch, allocator_used->AllocateBytes(
                                             runner->GetWorkspaceSize()));
       return (*runner)(stream, profile_result, scratch, input_ptr, filter_ptr,
@@ -296,15 +344,18 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
       }
     }
 
+    VLOG(1) << "Cudnn use frontend: " << (CudnnUseFrontend() ? "true" : "false")
+            << " found working engine: "
+            << (found_working_engine ? "true" : "false");
     if (!CudnnUseFrontend() || found_working_engine) {
+      VLOG(1) << "Get autotune_entry from heuristics results";
       TF_ASSIGN_OR_RETURN(
           autotune_entry,
           BestCudnnConvAlgorithm<se::dnn::ConvOp>(results, std::move(runners)));
     } else {
-      LOG(WARNING)
-          << "None of the algorithms provided by cuDNN frontend heuristics "
-             "worked; trying fallback algorithms.  Conv: "
-          << conv_parameters.ToString();
+      VLOG(1) << "None of the algorithms provided by cuDNN frontend heuristics "
+                 "worked; trying fallback algorithms.  Conv: "
+              << conv_parameters.ToString();
       std::vector<std::unique_ptr<const se::dnn::ConvRunner>> fallback_runners;
       TF_RETURN_IF_ERROR(stream->parent()->GetConvolveRunners(
           CudnnUseFrontend(), kind, element_type, element_type, stream,
@@ -383,6 +434,8 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
     VLOG(1) << "Insert autotune map in autotune unfused conv";
     autotune_map->Insert(conv_parameters, autotune_entry);
   }
+
+  VLOG(1) << "autotune entry is: " << autotune_entry.ToString();
 
   return autotune_entry;
 }
