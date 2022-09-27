@@ -84,6 +84,7 @@ StatusOr<std::unique_ptr<HloModuleConfig>> CreateModuleConfig(
     computation_layout->mutable_result_layout()->SetToDefaultLayout();
   }
 
+  VLOG(1) << "execution options is null: " << (execution_options == nullptr ? "yes" : "no");
   if (execution_options != nullptr) {
     if (execution_options->num_replicas() > 0) {
       config->set_replica_count(execution_options->num_replicas());

@@ -1082,6 +1082,7 @@ static Status CompileModuleToLlvmIrImpl(
 
 #if XLA_ENABLE_XLIR
   if (IsBefExecutableEnabled(hlo_module->config())) {
+    LOG(INFO) << "BefExecutable is enabled";
     std::vector<int64_t> buffer_sizes;
     llvm::transform(
         results->allocations, std::back_inserter(buffer_sizes),
@@ -1101,6 +1102,7 @@ static Status CompileModuleToLlvmIrImpl(
   }
 
   if (IsJitRtExecutableEnabled(hlo_module->config())) {
+    LOG(INFO) << "JitRtExecutable is enabled";
     std::vector<int64_t> buffer_sizes;
     llvm::transform(
         results->allocations, std::back_inserter(buffer_sizes),
@@ -1482,6 +1484,8 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
   std::vector<std::unique_ptr<AotCompilationResult>> results;
 
   for (const auto& module : modules) {
+    LOG(INFO) << "Compiling on HloModule with compilation cache key: " << module->config().compilation_cache_key();
+
     XLA_SCOPED_LOGGING_TIMER(
         "GpuCompiler::CompileAheadOfTime - compiling one HloModule");
 

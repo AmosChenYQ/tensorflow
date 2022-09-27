@@ -413,6 +413,8 @@ LocalClient::CompileAheadOfTime(
     const ExecutableBuildOptions& options) {
   TF_ASSIGN_OR_RETURN(ExecutableBuildOptions updated_options,
                       UpdateBuildOptions(options, default_device_ordinal()));
+  VLOG(1) << "Call local service's CompileAotResults with executable build options: ";
+  VLOG(1) << (updated_options.has_debug_options() ? (updated_options.debug_options().xla_gpu_bef_executable() ? "xla gpu bef executable enabled" : "xla gpu bef executable disabled") : "none debug options");
   TF_ASSIGN_OR_RETURN(
       std::vector<std::unique_ptr<AotCompilationResult>> aot_results,
       local_service_->CompileAotResults(computation, argument_layouts,

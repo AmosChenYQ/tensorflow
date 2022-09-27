@@ -683,3 +683,5 @@ test:experimental_enable_bef_thunk       --test_env=XLA_FLAGS=--xla_gpu_bef_thun
 build:experimental_enable_bef_executable --config=experimental_enable_xlir
 test:experimental_enable_bef_executable  --test_env=XLA_FLAGS=--xla_gpu_bef_executable
 
+# Enable build with enable_xlir flag to serialize executable entries to folder
+build:enable_xlir_in_xla --//tensorflow/compiler/xla/service/gpu:enable_xlir

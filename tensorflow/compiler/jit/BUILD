@@ -318,6 +318,7 @@ cc_library(
     deps = XLA_DEVICE_DEPS + [
         ":flags_headers",
         ":xla_compilation_cache",
+        "//tensorflow/core/platform:logging",
     ],
     alwayslink = 1,
 )
