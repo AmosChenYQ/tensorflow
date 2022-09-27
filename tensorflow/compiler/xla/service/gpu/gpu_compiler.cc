@@ -40,15 +40,15 @@ limitations under the License.
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Transforms/Utils/SplitModule.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"  // from @llvm-project
-#include "mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
-#include "mlir/Dialect/GPU/Transforms/Passes.h"  // from @llvm-project
-#include "mlir/IR/BuiltinOps.h"  // from @llvm-project
-#include "mlir/InitAllDialects.h"  // from @llvm-project
-#include "mlir/Pass/PassManager.h"  // from @llvm-project
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"       // from @llvm-project
+#include "mlir/Dialect/Func/IR/FuncOps.h"                // from @llvm-project
+#include "mlir/Dialect/GPU/Transforms/Passes.h"          // from @llvm-project
+#include "mlir/IR/BuiltinOps.h"                          // from @llvm-project
+#include "mlir/InitAllDialects.h"                        // from @llvm-project
+#include "mlir/Pass/PassManager.h"                       // from @llvm-project
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"  // from @llvm-project
-#include "mlir/Transforms/LocationSnapshot.h"  // from @llvm-project
-#include "mlir/Transforms/Passes.h"  // from @llvm-project
+#include "mlir/Transforms/LocationSnapshot.h"            // from @llvm-project
+#include "mlir/Transforms/Passes.h"                      // from @llvm-project
 #include "tensorflow/compiler/mlir/xla/hlo_utils.h"
 #include "tensorflow/compiler/mlir/xla/location_metadata.h"
 #include "tensorflow/compiler/mlir/xla/type_to_shape.h"
@@ -1112,6 +1112,7 @@ static Status CompileModuleToLlvmIrImpl(
   }
 
   if (IsJitRtExecutableEnabled(hlo_module->config())) {
+    LOG(INFO) << "JitRtExecutable is enabled";
     std::vector<int64_t> buffer_sizes;
     llvm::transform(
         results->allocations, std::back_inserter(buffer_sizes),
@@ -1487,6 +1488,39 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
   std::vector<std::unique_ptr<AotCompilationResult>> results;
 
   for (const auto& module : modules) {
+    LOG(INFO) << "Compiling HloModule with compilation cache key to LLVM IR: "
+              << module->config().compilation_cache_key();
+
+    XLA_SCOPED_LOGGING_TIMER(
+        "GpuCompiler::CompileAheadOfTime - compiling one HloModule");
+
+    // remove this part of code after cl/3420fe2
+    /*
+    if (!options.run_backend_only()) {
+      uint64_t start_usecs = tensorflow::Env::Default()->NowMicros();
+      tensorflow::profiler::TraceMe activity(
+          [&] { return absl::StrCat("HLO Transforms:", module->name()); },
+          tensorflow::profiler::TraceMeLevel::kInfo);
+      TF_RETURN_IF_ERROR(OptimizeHloModule(module.get(), stream_exec,
+                                           options.device_allocator()));
+
+      TF_RETURN_IF_ERROR(PrepareHloModuleForIrEmitting(module.get()));
+
+      uint64_t end_usecs = tensorflow::Env::Default()->NowMicros();
+
+      // This won't record values for calls that error out (because if they
+      // error out we have no way of telling how far through the process we
+      // got).
+      RecordHloPassesDuration(end_usecs - start_usecs);
+    }
+    */
+
+    // remove this after cl/3420fe2
+    /*
+    std::string slow_compilation_msg =
+        absl::StrCat("Compiling module ", module->name());
+    auto slow_compile_alarm = SlowCompilationAlarm(slow_compilation_msg);
+    */
     llvm::LLVMContext llvm_context;
     GpuDeviceInfo gpu_device_info = GetGpuDeviceInfo(stream_exec);
 

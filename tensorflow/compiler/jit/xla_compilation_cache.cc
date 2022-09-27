@@ -31,7 +31,7 @@ limitations under the License.
 #include "tensorflow/compiler/jit/xla_activity.pb.h"
 #include "tensorflow/compiler/jit/xla_activity_listener.h"
 #include "tensorflow/compiler/jit/xla_cluster_util.h"
-#include "tensorflow/compiler/jit/xla_compilation_cache.pb.h"
+#include "tensorflow/compiler/mlir/mlir_bridge_rollout_policy.h"
 #include "tensorflow/compiler/mlir/tensorflow/utils/compile_mlir_util.h"
 #include "tensorflow/compiler/mlir/utils/array_container_utils.h"
 #include "tensorflow/compiler/tf2xla/shape_util.h"
@@ -269,6 +269,8 @@ static xla::ExecutableBuildOptions GetBuildOptions(
   build_options.set_alias_passthrough_params(options.alias_passthrough_params);
   build_options.mutable_debug_options()->set_xla_detailed_logging_and_dumping(
       options.detailed_logging);
+  // Force enable xla_gpu_bef_executable here
+  build_options.mutable_debug_options()->set_xla_gpu_bef_executable(true);
   if (tensorflow::OpDeterminismRequired()) {
     build_options.mutable_debug_options()->set_xla_gpu_deterministic_ops(true);
   }
@@ -330,6 +332,7 @@ Status XlaCompilationCache::Compile(
     CompileMode compile_mode,
     const XlaCompiler::CompilationResult** out_compilation_result,
     xla::LocalExecutable** out_executable) {
+  LOG(INFO) << "XlaCompilationCache with compile_mode: " << static_cast<std::underlying_type<CompileMode>::type>(compile_mode);
   return CompileImpl(compile_options, options, function, args,
                      /*ctx=*/nullptr, CompileScope::kFunction, compile_mode,
                      out_compilation_result, out_executable);
@@ -518,6 +521,8 @@ Status XlaCompilationCache::CompileStrict(
 
   std::optional<XlaSerializedCacheEntry> serialized_entry;
   if (!persistent_cache_directory_.empty()) {
+    LOG(INFO) << "XLA persistent cahce directory is not empty, trying to get "
+                 "serialized entry by cache key.";
     const xla::HloModuleProto& hlo_module =
         entry->compilation_result.computation->proto();
 
@@ -525,7 +530,7 @@ Status XlaCompilationCache::CompileStrict(
 
     {
       XLA_SCOPED_LOGGING_TIMER(absl::StrCat(
-          "Try loading serialized cache entry:", sig.HumanString()));
+          "Try loading serialized cache entry: ", sig.HumanString()));
       TF_ASSIGN_OR_RETURN(serialized_entry, TryLoadSerializedEntry(cache_key));
     }
 
@@ -649,7 +654,12 @@ bool XlaCompilationCache::ShouldCompileCluster(CompileMode compile_mode,
                                                bool is_first_execution,
                                                int64_t current_request_count,
                                                const NameAttrList& function) {
-  std::optional<int64_t> compile_threshold;
+  LOG(INFO) << "Infer function with name: " << function.name();
+  LOG(INFO) << "compile mode: " << static_cast<std::underlying_type<CompileMode>::type>(compile_mode)
+            << " is megamorphic: " << is_megamorphic
+            << " is first execution: " << is_first_execution
+            << " currenct request count: " << current_request_count;
+  absl::optional<int64_t> compile_threshold;
   if (compile_mode == CompileMode::kLazy) {
     compile_threshold = kDefaultCompilationThreshold;
   } else if (compile_mode == CompileMode::kAsync) {
@@ -874,6 +884,7 @@ Status XlaCompilationCache::CompileImpl(
 
 XlaSerializedCacheKey XlaCompilationCache::BuildSerializedCacheKey(
     const Signature& sig, const xla::HloModuleProto& hlo_module) const {
+  VLOG(1) << "Build serialized cahce key";
   XlaSerializedCacheKey serialized_cache_key;
   serialized_cache_key.set_signature_fingerprint(Signature::Hash()(sig));
   serialized_cache_key.set_cluster_fingerprint(
@@ -973,6 +984,7 @@ XlaCompilationCache::TryLoadSerializedEntry(const XlaSerializedCacheKey& key) {
     return StatusOr<std::optional<XlaSerializedCacheEntry>>(std::nullopt);
   }
 
+  VLOG(1) << "Read XlaSerializedCacheEntry from file path: " << file_path;
   XlaSerializedCacheEntry entry;
   TF_RETURN_IF_ERROR(ReadTextOrBinaryProto(env, file_path, &entry));
   return StatusOr<std::optional<XlaSerializedCacheEntry>>(entry);

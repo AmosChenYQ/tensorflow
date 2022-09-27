@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "tensorflow/compiler/jit/flags.h"
 #include "tensorflow/compiler/xla/client/client_library.h"
+#include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/tpu/tpu_defs.h"
 
 namespace tensorflow {
@@ -52,7 +53,11 @@ Status BuildXlaCompilationCache(DeviceBase* device, FunctionLibraryRuntime* flr,
       GetMarkForCompilationPassFlags()->tf_xla_disable_strict_signature_checks,
       GetMarkForCompilationPassFlags()->tf_xla_persistent_cache_prefix);
 
+  LOG(INFO) << "XLA persistent cache directory is: " << GetMarkForCompilationPassFlags()->tf_xla_persistent_cache_directory;
+  LOG(INFO) << "XLA persistent cache prefix is: " << GetMarkForCompilationPassFlags()->tf_xla_persistent_cache_prefix;
+
   if (platform_info.xla_device_metadata()) {
+    LOG(INFO) << "XlaPlatformInfo has xla_device_metadata";
     *cache = new XlaCompilationCache(
         std::move(cache_config), platform_info.xla_device_metadata()->client(),
         platform_info.xla_device_metadata()->jit_device_type());

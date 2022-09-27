@@ -141,6 +141,8 @@ StatusOr<std::unique_ptr<HloModuleConfig>> LocalService::GetHloModuleConfig(
                                            program_shape.result()));
   }
 
+  VLOG(1) << "execution options created in LocalService::GetHloModuleConfig";
+
   ExecutionOptions execution_options =
       CreateExecutionOptions(build_options, &program_shape);
 

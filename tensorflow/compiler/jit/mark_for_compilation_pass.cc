@@ -97,8 +97,8 @@ class MarkForCompilationPassImpl {
     // If true, do not respect the _XlaCompile=false attribute.
     bool ignore_xla_compile_attr;
 
-    // If true, compute the cluster name in a deterministic way so that its
-    // stable from run to rum.
+    // If true, compute the cluster name in a deterministic way so that it's
+    // stable from run to run.
     bool deterministic_cluster_names;
 
     int max_cluster_size;

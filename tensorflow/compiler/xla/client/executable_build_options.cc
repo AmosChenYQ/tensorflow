@@ -181,6 +181,7 @@ ExecutionOptions CreateExecutionOptions(
     const ProgramShape* program_shape) {
   ExecutionOptions execution_options = CreateDefaultExecutionOptions();
   if (build_options.has_debug_options()) {
+    VLOG(1) << "execution options is created from build options";
     *execution_options.mutable_debug_options() = build_options.debug_options();
   }
   if (build_options.result_layout() != nullptr) {

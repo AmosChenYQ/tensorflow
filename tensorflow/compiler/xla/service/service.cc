@@ -340,17 +340,20 @@ Service::BuildAotResults(
     const Compiler::CompileOptions& options, bool run_backend_only) {
   VLOG(1) << StrFormat("BuildAotResults on service %p", this);
 
-  VLOG(1) << "Computations:";
+  VLOG(1) << "HloModule in BuildAotResult:";
   for (const HloModuleProto* proto : module_protos) {
     VLOG(1) << proto->name();
   }
 
+  VLOG(1) << "Configs corresponding to HloModule in BuildAotResult:";
   CHECK_EQ(module_protos.size(), module_configs.size());
   auto module_group =
       std::make_unique<HloModuleGroup>(module_protos[0]->name());
   for (int64_t i = 0, end = module_protos.size(); i < end; ++i) {
     const HloModuleProto* proto = module_protos[i];
     const HloModuleConfig& config = *module_configs[i];
+    VLOG(1) << "Is xla gpu bef enabled: " << (config.debug_options().xla_gpu_bef_executable() ? "yes" : "no")
+            << " Is xla gpu jitrt enabled: " << (config.debug_options().xla_gpu_jitrt_executable() ? "yes" : "no");
     TF_ASSIGN_OR_RETURN(
         auto module, CreateModuleFromProto(*proto, config, run_backend_only));
     DumpHloModuleIfEnabled(*module, kBeforeOptimizationsDumpName);
