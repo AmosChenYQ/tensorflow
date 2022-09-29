@@ -319,13 +319,13 @@ StatusOr<AutotuneEntry<se::dnn::ConvOp>> AutotuneUnfusedConv(
                        output_ptr);
     };
 
-    auto start = std::chrono::steady_clock::now();
+    start = std::chrono::steady_clock::now();
     TF_ASSIGN_OR_RETURN(auto results,
                         internal::AutotuneConvImpl(
                             ctx, runners, cudnn_use_autotune, launch_func,
                             scratch_size_limit, rz_allocator));
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double, std::milli> elapsed_milli_seconds = end - start;
+    end = std::chrono::steady_clock::now();
+    elapsed_milli_seconds = end - start;
     VLOG(1) << "Autotune unfused conv in fallback takes " << elapsed_milli_seconds.count() << "ms";
 
     LogConvAutotuneResults(kind, se::dnn::ToDataType<T>::value, input_ptr,

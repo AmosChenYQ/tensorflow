@@ -483,7 +483,7 @@ Status DirectSession::ExtendLocked(GraphDef&& graph) {
       }
       file_content_buf << inputfile.rdbuf();
       file_content = file_content_buf.str();
-      LoadSerializedAutotuneMaps(file_content);
+      auto load_status = LoadSerializedAutotuneMaps(file_content);
       auto read_file_end = std::chrono::steady_clock::now();
       std::chrono::duration<double, std::milli> read_file_duration =
           read_file_end - read_file_start;

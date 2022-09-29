@@ -31,7 +31,6 @@ limitations under the License.
 #include "tensorflow/compiler/jit/xla_activity.pb.h"
 #include "tensorflow/compiler/jit/xla_activity_listener.h"
 #include "tensorflow/compiler/jit/xla_cluster_util.h"
-#include "tensorflow/compiler/mlir/mlir_bridge_rollout_policy.h"
 #include "tensorflow/compiler/mlir/tensorflow/utils/compile_mlir_util.h"
 #include "tensorflow/compiler/mlir/utils/array_container_utils.h"
 #include "tensorflow/compiler/tf2xla/shape_util.h"
@@ -270,7 +269,7 @@ static xla::ExecutableBuildOptions GetBuildOptions(
   build_options.mutable_debug_options()->set_xla_detailed_logging_and_dumping(
       options.detailed_logging);
   // Force enable xla_gpu_bef_executable here
-  build_options.mutable_debug_options()->set_xla_gpu_bef_executable(true);
+  // build_options.mutable_debug_options()->set_xla_gpu_bef_executable(true);
   if (tensorflow::OpDeterminismRequired()) {
     build_options.mutable_debug_options()->set_xla_gpu_deterministic_ops(true);
   }

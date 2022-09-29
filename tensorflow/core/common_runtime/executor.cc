@@ -629,7 +629,7 @@ void ExecutorState<PropagatorStateType>::ProcessAsync(
       new AsyncState(params, tagged_node, &item, first_input, stats);
 
   auto done = [this, state, activity_id]() {
-    VLOG(3) << "ProcessAsync: " << item.DebugString();
+    VLOG(3) << "ProcessAsync: " << state->item->DebugString();
 
     Device* device = immutable_state_.params().device;
     NodeExecStatsInterface* stats = state->stats;  // Shorthand

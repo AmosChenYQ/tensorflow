@@ -352,8 +352,8 @@ Service::BuildAotResults(
   for (int64_t i = 0, end = module_protos.size(); i < end; ++i) {
     const HloModuleProto* proto = module_protos[i];
     const HloModuleConfig& config = *module_configs[i];
-    VLOG(1) << "Is xla gpu bef enabled: " << (config.debug_options().xla_gpu_bef_executable() ? "yes" : "no")
-            << " Is xla gpu jitrt enabled: " << (config.debug_options().xla_gpu_jitrt_executable() ? "yes" : "no");
+    // VLOG(1) << "Is xla gpu bef enabled: " << (config.debug_options().xla_gpu_bef_executable() ? "yes" : "no")
+    //         << " Is xla gpu jitrt enabled: " << (config.debug_options().xla_gpu_jitrt_executable() ? "yes" : "no");
     TF_ASSIGN_OR_RETURN(
         auto module, CreateModuleFromProto(*proto, config, run_backend_only));
     DumpHloModuleIfEnabled(*module, kBeforeOptimizationsDumpName);
