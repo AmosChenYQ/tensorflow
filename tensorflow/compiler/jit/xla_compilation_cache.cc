@@ -268,7 +268,10 @@ static xla::ExecutableBuildOptions GetBuildOptions(
   build_options.set_alias_passthrough_params(options.alias_passthrough_params);
   build_options.mutable_debug_options()->set_xla_detailed_logging_and_dumping(
       options.detailed_logging);
-  // Force enable xla_gpu_bef_executable here
+  // TODO(amoschenyq): Change debug options back to default false
+  // Force enable set_xla_gpu_enable_xla_runtime_executable
+  build_options.mutable_debug_options()->set_xla_gpu_enable_xla_runtime_executable(true);
+  // Force enable xla_gpu_bef_executable here, but it has been removed in latest
   // build_options.mutable_debug_options()->set_xla_gpu_bef_executable(true);
   if (tensorflow::OpDeterminismRequired()) {
     build_options.mutable_debug_options()->set_xla_gpu_deterministic_ops(true);

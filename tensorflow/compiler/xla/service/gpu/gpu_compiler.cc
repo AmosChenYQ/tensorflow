@@ -1149,6 +1149,8 @@ GpuCompiler::CompileToTargetBinary(const HloModuleConfig& module_config,
                                    const HloModule* debug_module) {
   using BackendCompileResult = std::pair<std::string, std::vector<uint8_t>>;
 
+  LOG(INFO) << "In CompileToTargetBinary";
+
   const auto compile_single_module =
       [this, stream_exec, &module_config, debug_module](
           llvm::Module* llvm_module, bool relocatable,
@@ -1494,7 +1496,7 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
     XLA_SCOPED_LOGGING_TIMER(
         "GpuCompiler::CompileAheadOfTime - compiling one HloModule");
 
-    // remove this part of code after cl/3420fe2
+    // TODO(amoschenyq): Have been removed this part of code after cl/3420fe2
     /*
     if (!options.run_backend_only()) {
       uint64_t start_usecs = tensorflow::Env::Default()->NowMicros();
@@ -1515,7 +1517,7 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
     }
     */
 
-    // remove this after cl/3420fe2
+    // TODO(amoschenyq): Have been removed this part of code after cl/3420fe2
     /*
     std::string slow_compilation_msg =
         absl::StrCat("Compiling module ", module->name());
@@ -1533,6 +1535,11 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
         stream_exec->GetDeviceDescription().cuda_compute_capability(),
         stream_exec->GetDeviceDescription().rocm_compute_capability(),
         GetCanShareBuffer(), pointer_size_, &compile_module_results));
+
+    LOG(INFO) << std::boolalpha
+              << "After compiling the module whether compiled executable owned "
+                 "Jit runtime program "
+              << std::holds_alternative<OwnedJitRtProgram>(compile_module_results.executable);
 
     if (user_pre_optimization_hook_) {
       user_pre_optimization_hook_(*compile_module_results.llvm_module);
@@ -1573,6 +1580,7 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
     // Instantiate new JitExecutable from the MLIR source.
     auto jit_executable = runtime::JitExecutable::Instantiate(
         program->module, program->entry_point, opts);
+    LOG(INFO) << "Before checking jit executable";
     if (!jit_executable.ok())
       return InternalError("Failed to compile XLA program: %s",
                            jit_executable.status().message());

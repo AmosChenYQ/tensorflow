@@ -131,6 +131,8 @@ static std::unique_ptr<MLIRContext> CreateMlirContext(
   auto threading = MLIRContext::Threading::DISABLED;
   auto ctx = std::make_unique<MLIRContext>(registry, threading);
   ctx->loadAllAvailableDialects();
+  // TODO(amoschenyq): Try to allowUnregisteredDialects
+  // ctx->allowUnregisteredDialects(true);
   return ctx;
 }
 
@@ -150,6 +152,7 @@ JitCompiler::JitCompiler(JitCompiler::Options opts,
       llvm::MemoryBuffer::getMemBuffer(mlir_module, "xla.program"),
       llvm::SMLoc());
 
+  LOG(INFO) << "Constructing JitCompiler";
   module_ = parseSourceFile<ModuleOp>(source_mgr_, context_.get());
   if (module_) entrypoint_ = module_->lookupSymbol<func::FuncOp>(entrypoint);
 }

@@ -391,6 +391,7 @@ StatusOr<AutotuneResult> GpuConvAlgorithmPicker::PickBestAlgorithm(
     result_or = PickBestAlgorithmNoCacheRocm(instr, allocator, stream);
   } else if (stream_exec_->platform_kind() == se::PlatformKind::kCuda) {
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA)
+    LOG(INFO) << "Entering into PickBestAlgorithmNoCacheCuda";
     result_or = PickBestAlgorithmNoCacheCuda(instr, allocator, stream);
 #endif
   }

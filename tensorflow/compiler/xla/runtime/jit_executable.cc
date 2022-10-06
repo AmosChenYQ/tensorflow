@@ -106,15 +106,21 @@ static bool HasStaticShapeOperands(const FunctionType& signature) {
       JitCompiler::Instantiate(opts.compiler, mlir_module, entrypoint);
   if (!compiler.ok()) return compiler.status();
 
+  LOG(INFO) << "Instantiating compilation context from the mlir source succeeded";
+
   // Get resolved operands constraints for the entrypoint function.
   auto constraints = GetArgumentsConstraints((*compiler)->entrypoint());
   if (!constraints.ok()) return constraints.status();
+
+  LOG(INFO) << "Getting resolved operands constraints for the entrypoint function succeeded";
 
   // Get the entrypoint function signature, it will be later required to
   // compute the specialized function signature from the operands at runtime.
   auto signature = opts.compiler.type_converter.Convert(
       (*compiler)->entrypoint().getFunctionType());
   if (!signature.ok()) return signature.status();
+
+  LOG(INFO) << "Computing the specialized function signature from the operands secceeded";
 
   // If all of the operands have static shape, then we can always use default
   // binary for execution (unless specialization is explicitly required by the
