@@ -104,7 +104,10 @@ static bool HasStaticShapeOperands(const FunctionType& signature) {
   // Try to instantiate compilation context from the mlir source.
   StatusOr<std::unique_ptr<JitCompiler>> compiler =
       JitCompiler::Instantiate(opts.compiler, mlir_module, entrypoint);
-  if (!compiler.ok()) return compiler.status();
+  if (!compiler.ok()) {
+    LOG(INFO) << "Compiler instantiation doesn't succeed";
+    return compiler.status();
+  }
 
   LOG(INFO) << "Instantiating compilation context from the mlir source succeeded";
 

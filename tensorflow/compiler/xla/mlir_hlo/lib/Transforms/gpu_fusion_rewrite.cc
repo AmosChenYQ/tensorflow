@@ -17,6 +17,7 @@ limitations under the License.
 #include <memory>
 #include <string>
 #include <utility>
+#include <iostream>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -105,6 +106,7 @@ void GpuFusionRewritePass::getDependentDialects(
 }
 
 void GpuFusionRewritePass::runOnOperation() {
+  std::cout << "amoschenyq: run on operation GpuFusionRewritePass\n";
   SymbolTable symbolTable(getOperation());
   auto pattern =
       std::make_unique<FusionRewritePattern>(&getContext(), *this, symbolTable);

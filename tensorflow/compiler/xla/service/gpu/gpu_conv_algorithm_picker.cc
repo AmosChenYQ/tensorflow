@@ -391,7 +391,6 @@ StatusOr<AutotuneResult> GpuConvAlgorithmPicker::PickBestAlgorithm(
     result_or = PickBestAlgorithmNoCacheRocm(instr, allocator, stream);
   } else if (stream_exec_->platform_kind() == se::PlatformKind::kCuda) {
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA)
-    LOG(INFO) << "Entering into PickBestAlgorithmNoCacheCuda";
     result_or = PickBestAlgorithmNoCacheCuda(instr, allocator, stream);
 #endif
   }
@@ -644,9 +643,13 @@ StatusOr<tensorflow::AutotuneResult>
 GpuConvAlgorithmPicker::PickBestAlgorithmNoCacheCuda(
     const HloCustomCallInstruction* instr, se::DeviceMemoryAllocator* allocator,
     se::Stream* stream) {
+  LOG(INFO) << "Entering into PickBestAlgorithmNoCacheCuda";
+  
   // Right now Redzone allocator is available in Cuda target only
   XLA_SCOPED_LOGGING_TIMER(absl::StrCat(
       "GpuConvAlgorithmPicker::PickBestAlgorithmImpl for ", instr->ToString()));
+
+  LOG(INFO) << "Entering after XLA scoped logger timer of GpuConvAlgorithmPicker::PickBestAlgorithmImpl";
 
   const Shape& result_shape = instr->shape().tuple_shapes(0);
   int64_t rng_state = 0;
@@ -669,6 +672,9 @@ GpuConvAlgorithmPicker::PickBestAlgorithmNoCacheCuda(
       PtxOptsFromDebugOptions(hlo_module_config.debug_options()),
       /*memory_limit=*/std::numeric_limits<int64_t>::max(),
       /*redzone_size=*/redzone_size);
+  
+  LOG(INFO) << "Initialize input/output allocator succeed";
+
   std::vector<se::DeviceMemoryBase> operand_buffers;
   for (const auto* operand : instr->operands()) {
     TF_ASSIGN_OR_RETURN(auto buffer,
@@ -681,6 +687,8 @@ GpuConvAlgorithmPicker::PickBestAlgorithmNoCacheCuda(
                       input_output_allocator.AllocateBytes(
                           ShapeUtil::ByteSizeOf(result_shape)));
   initialize_buffer(result_buffer, result_shape);
+
+  LOG(INFO) << "Initialize buffer succeed";
 
   const DebugOptions& debug_options =
       instr->GetModule()->config().debug_options();

@@ -620,8 +620,8 @@ XlaCompileOp::XlaCompileOp(OpKernelConstruction* ctx)
       has_ref_vars_(HasRefVars(ctx)) {}
 
 void XlaCompileOp::Compute(OpKernelContext* ctx) {
-  VLOG(3) << "XlaCompileOp " << def().name()
-          << (must_compile_ ? "(must-compile)" : "");
+  VLOG(3) << "XlaCompileOp's Compute: " << def().name()
+          << (must_compile_ ? "(must-compile)" : "(may-not-compile");
   xla::LocalClient* client;
   const XlaCompiler::CompilationResult* kernel;
   xla::LocalExecutable* executable;
@@ -716,7 +716,7 @@ XlaRunOp::XlaRunOp(OpKernelConstruction* ctx)
     : OpKernel(ctx), platform_info_(XlaPlatformInfoFromDevice(ctx->device())) {}
 
 void XlaRunOp::Compute(OpKernelContext* ctx) {
-  VLOG(3) << "XlaRunOp " << def().name();
+  VLOG(3) << "XlaRunOp's Compute: " << def().name();
   Tensor key_tensor = ctx->input(ctx->num_inputs() - 1);
   const XlaExecutableClosureStore::KeyT& key = key_tensor.flat<tstring>()(0);
 

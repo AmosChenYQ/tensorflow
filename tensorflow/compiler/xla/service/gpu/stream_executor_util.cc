@@ -529,6 +529,8 @@ bool RequireDeterminism(const HloModuleConfig& config) {
 StatusOr<AutotuneResult> PickBestResult(
     absl::Span<AutotuneResult const> profile_results,
     const HloInstruction& instr) {
+  LOG(INFO) << "Pick best results from profile results";
+
   std::vector<AutotuneResult> filtered_results;
 
   // For now, we ignore WRONG_RESULT failures because false-positives are

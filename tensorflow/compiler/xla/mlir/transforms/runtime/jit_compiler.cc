@@ -27,9 +27,9 @@ limitations under the License.
 #include "llvm/Pass.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/ExecutionEngine/OptUtils.h"  // from @llvm-project
-#include "mlir/Parser/Parser.h"  // from @llvm-project
-#include "mlir/Pass/PassManager.h"  // from @llvm-project
-#include "mlir/Target/LLVMIR/Export.h"  // from @llvm-project
+#include "mlir/Parser/Parser.h"             // from @llvm-project
+#include "mlir/Pass/PassManager.h"          // from @llvm-project
+#include "mlir/Target/LLVMIR/Export.h"      // from @llvm-project
 #include "tensorflow/compiler/xla/mlir/transforms/runtime/passes.h"
 #include "tensorflow/compiler/xla/runtime/symbolic_shape.h"
 
@@ -108,6 +108,7 @@ static LogicalResult RunPipeline(
 // Runs the user-provided compilation pipeline to compile the module to LLVM.
 static LogicalResult RunCompilationPipeline(ModuleOp module,
                                             const JitCompiler::Options& opts) {
+  LOG(INFO) << "Run Compilation Pipeline for module op";
   return RunPipeline(module, opts.create_compilation_pipeline);
 }
 
@@ -152,7 +153,9 @@ JitCompiler::JitCompiler(JitCompiler::Options opts,
       llvm::MemoryBuffer::getMemBuffer(mlir_module, "xla.program"),
       llvm::SMLoc());
 
-  LOG(INFO) << "Constructing JitCompiler";
+  LOG(INFO) << "Constructing JitCompiler\nWith mlir module:\n"
+            << mlir_module << "\nWith entry point:\n"
+            << entrypoint;
   module_ = parseSourceFile<ModuleOp>(source_mgr_, context_.get());
   if (module_) entrypoint_ = module_->lookupSymbol<func::FuncOp>(entrypoint);
 }

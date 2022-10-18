@@ -961,6 +961,7 @@ StatusOr<std::unique_ptr<BufferAssignment>> BufferAssigner::Run(
     std::optional<BufferAssigner::MustNotLiveOut> must_not_live_out,
     HloDataflowAnalysis::CanShareBuffer can_share_buffer,
     std::unique_ptr<PresetAssignments> preset_assignments) {
+  LOG(INFO) << "Run Buffer assignment for hlo module " << module->name();
   BufferAssigner assigner(allocate_buffers_for_constants, std::move(colorer),
                           must_not_live_out, std::move(preset_assignments));
   return assigner.CreateAssignment(

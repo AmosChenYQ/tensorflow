@@ -417,8 +417,8 @@ LocalClient::CompileAheadOfTime(
              "options: ";
   VLOG(1) << (updated_options.has_debug_options()
                   ? (updated_options.debug_options().xla_gpu_enable_xla_runtime_executable()
-                         ? "xla gpu bef executable enabled"
-                         : "xla gpu bef executable disabled")
+                         ? "xla runtime executable enabled"
+                         : "xla runtime executable disabled")
                   : "none debug options");
   // VLOG(1) << (updated_options.has_debug_options()
   //                 ? (updated_options.debug_options().xla_gpu_bef_executable()

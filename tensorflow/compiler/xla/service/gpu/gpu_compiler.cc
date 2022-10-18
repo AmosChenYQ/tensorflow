@@ -347,6 +347,7 @@ void AddHloVerifier(HloPassPipeline* pipeline, HloVerifierOpts&& opts = {},
 Status GpuCompiler::OptimizeHloModule(
     HloModule* hlo_module, se::StreamExecutor* stream_exec,
     se::DeviceMemoryAllocator* device_allocator) {
+  LOG(INFO) << "Run optimize for hlo module " << hlo_module->name();
   const DebugOptions& debug_options = hlo_module->config().debug_options();
 
   AlgebraicSimplifierOptions layout_insensitive_algsimp_opts({},
@@ -921,10 +922,10 @@ static StatusOr<OwnedJitRtProgram> LowerToJitRt(
   func->setAttr("replica_count", replica_count_attr);
   func->setAttr("num_partitions", num_partitions_attr);
 
-  // Lower LMHLO operations to the JitRt compatible custom calls.
-  TF_RETURN_IF_ERROR(LowerToXlaGpuRuntime(
-      mlir_module, {entry_function_name.data(), entry_function_name.size()},
-      buffer_sizes, thunk_sequence.get()));
+      // Lower LMHLO operations to the JitRt compatible custom calls.
+      TF_RETURN_IF_ERROR(LowerToXlaGpuRuntime(
+          mlir_module, {entry_function_name.data(), entry_function_name.size()},
+          buffer_sizes, thunk_sequence.get()));
   // Serialize module to pass it to GpuExecutable for compilation.
   std::string serialized_module;
   llvm::raw_string_ostream os(serialized_module);
@@ -1051,11 +1052,22 @@ static Status CompileModuleToLlvmIrImpl(
   mlir::OwningOpRef<mlir::ModuleOp> mlir_module =
       mlir::ModuleOp::create(mlir::Builder(&mlir_context).getUnknownLoc());
 
+  LOG(INFO) << "Before changing HLO to LMHO module:\n"
+            << "Original HLO module entry point name: "
+            << hlo_module->entry_computation()->name()
+            << "\nAnd HLO module source:\n"
+            << hlo_module->ToString() << "\n";
+
   TF_RETURN_IF_ERROR(
       HloToLhloModule(*results->buffer_assignment, *hlo_module, *mlir_module));
 
   results->module_name =
       mlir::mhlo::GetDebugNameFromLocation(mlir_module->getLoc());
+
+  LOG(INFO) << "After changing HLO to LMHO module:\n"
+            << "LMHO module name:" << results->module_name
+            << "\nAnd LMHO module source:\n";
+  mlir_module.get().dump();
 
   if (DumpingEnabledForHloModule(*hlo_module)) {
     DumpToFileInDirOrStdout(*hlo_module, "lmhlo", mlir_module.get());
@@ -1074,6 +1086,10 @@ static Status CompileModuleToLlvmIrImpl(
     if (failed(pm.run(mlir_module.get()))) {
       return InternalError("Failed to run gpu-fusion-rewrite pass");
     }
+    LOG(INFO) << "Running gpu fusion rewrite pass succeed "
+              << "LMHO module name:" << results->module_name
+              << "\nAnd LMHO module source:\n";
+    mlir_module.get().dump();
   }
 
   IrEmitterContext ir_emitter_context(
@@ -1099,6 +1115,7 @@ static Status CompileModuleToLlvmIrImpl(
     if (supports_runtime_managed_constants) {
       // Remove these globals from the generated code to indicate that XLA is
       // responsible for allocating and initializing them.
+      LOG(INFO) << "Remove unused and uninitialzed globals";
       RemoveUnusedAndUninitializedGlobals(ir_emitter_context.llvm_module(),
                                           ir_emitter_context.constants());
     }
@@ -1190,6 +1207,7 @@ GpuCompiler::CompileToTargetBinary(const HloModuleConfig& module_config,
                                    module_config.debug_options());
 
     if (should_dump) {
+      LOG(INFO) << "Should dump LLVM IR result";
       if (debug_module) {
         if (shard_number.has_value()) {
           llvm_ir::DumpIrIfEnabled(*debug_module, *llvm_module,
@@ -1213,6 +1231,7 @@ GpuCompiler::CompileToTargetBinary(const HloModuleConfig& module_config,
 
     // Write PTX to IR dump directory, if IR dumping was requested.
     if (should_dump) {
+      LOG(INFO) << "Should dump PTX IR result";
       absl::string_view ptx = result->first;
       if (debug_module) {
         if (shard_number.has_value()) {
@@ -1230,7 +1249,7 @@ GpuCompiler::CompileToTargetBinary(const HloModuleConfig& module_config,
     }
 
     return result;
-  };
+  };  // end of compile_single_module lambda function
 
   tsl::thread::ThreadPool* thread_pool;
   std::optional<tsl::thread::ThreadPool> overriding_thread_pool;
@@ -1518,11 +1537,11 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
     */
 
     // TODO(amoschenyq): Have been removed this part of code after cl/3420fe2
-    /*
+
     std::string slow_compilation_msg =
         absl::StrCat("Compiling module ", module->name());
     auto slow_compile_alarm = SlowCompilationAlarm(slow_compilation_msg);
-    */
+
     llvm::LLVMContext llvm_context;
     GpuDeviceInfo gpu_device_info = GetGpuDeviceInfo(stream_exec);
 
@@ -1539,7 +1558,8 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
     LOG(INFO) << std::boolalpha
               << "After compiling the module whether compiled executable owned "
                  "Jit runtime program "
-              << std::holds_alternative<OwnedJitRtProgram>(compile_module_results.executable);
+              << std::holds_alternative<OwnedJitRtProgram>(
+                     compile_module_results.executable);
 
     if (user_pre_optimization_hook_) {
       user_pre_optimization_hook_(*compile_module_results.llvm_module);
@@ -1551,6 +1571,9 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
         CompileToTargetBinary(
             module->config(), std::move(compile_module_results.llvm_module),
             stream_exec, {options.device_allocator()}, module.get()));
+
+    LOG(INFO) << "After compiling to target binary backend result is:\n"
+              << backend_result.first << "\n";
 
     auto& compiled_executable = compile_module_results.executable;
 

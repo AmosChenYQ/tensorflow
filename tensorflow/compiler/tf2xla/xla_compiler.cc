@@ -571,12 +571,12 @@ Status XlaCompiler::FindFunctionBody(const NameAttrList& function,
     if (config_proto) {
       *config_proto = flib_runtime_->config_proto();
     }
-    VLOG(4) << "Function " << function.name() << " in flib_runtime_";
+    VLOG(1) << "Function " << function.name() << " in flib_runtime_";
   } else {
     if (config_proto) {
       *config_proto = local_flib_runtime_->config_proto();
     }
-    VLOG(4) << "Function " << function.name() << " in local_flib_runtime_";
+    VLOG(1) << "Function " << function.name() << " in local_flib_runtime_";
   }
   return OkStatus();
 }
@@ -749,6 +749,14 @@ Status XlaCompiler::CompileFunction(
   std::optional<ConfigProto> config_proto;
   if (config) {
     config_proto = *config;
+    string config_proto_debug_info;
+    ::tensorflow::protobuf::TextFormat::PrintToString(*config,
+                                                      &config_proto_debug_info);
+    VLOG(1) << "Config proto is:\n" << config_proto_debug_info;
+  }
+
+  if(!config) {
+    VLOG(1) << "Config proto is nullopt";
   }
 
   TF_RETURN_WITH_CONTEXT_IF_ERROR(
@@ -816,6 +824,7 @@ Status XlaCompiler::CompileFunction(
 
   auto state = ConfigProto::Experimental::MLIR_BRIDGE_ROLLOUT_DISABLED;
   if (options.is_entry_computation) {
+    VLOG(1) << "This is entry computation";
     state = GetMlirBridgeRolloutState(config_proto);
   }
 
