@@ -313,7 +313,7 @@ class XlaCompilationCache : public ResourceBase {
 
   // The number of times a lazy compilation must be requested for a specific
   // signature before  we attempt to compile it.
-  static constexpr int64_t kDefaultCompilationThreshold = 2;
+  static constexpr int64_t kDefaultCompilationThreshold = 1;
 
   // If non-empty, JIT-compiled executables are saved to and loaded from the
   // specified file system directory path.
