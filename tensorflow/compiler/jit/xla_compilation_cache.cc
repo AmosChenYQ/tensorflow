@@ -332,7 +332,9 @@ Status XlaCompilationCache::Compile(
     CompileMode compile_mode,
     const XlaCompiler::CompilationResult** out_compilation_result,
     xla::LocalExecutable** out_executable) {
-  LOG(INFO) << "XlaCompilationCache with compile_mode: " << static_cast<std::underlying_type<CompileMode>::type>(compile_mode);
+  LOG(INFO) << "XlaCompilationCache with compile_mode: "
+            << static_cast<std::underlying_type<CompileMode>::type>(
+                   compile_mode);
   return CompileImpl(compile_options, options, function, args,
                      /*ctx=*/nullptr, CompileScope::kFunction, compile_mode,
                      out_compilation_result, out_executable);
@@ -541,13 +543,20 @@ Status XlaCompilationCache::CompileStrict(
   }
 
   if (serialized_entry.has_value()) {
-    VLOG(1) << "Loading cached entry for: " << sig.HumanString();
+    VLOG(1) << "Loading cached entry & build executable for: "
+            << sig.HumanString();
+    const uint64 build_executable_start_us = env->NowMicros();
     StatusOr<std::unique_ptr<xla::LocalExecutable>> executable = LoadExecutable(
         options, entry->compilation_result, serialized_entry->executable());
     entry->compilation_status = executable.status();
     if (executable.ok()) {
       entry->executable = *std::move(executable);
     }
+    const uint64 build_executable_end_us = env->NowMicros();
+    const uint64 build_executable_us =
+        build_executable_end_us - build_executable_start_us;
+    VLOG(1) << "Loading cached entry & build executable for: "
+            << sig.HumanString() << " takes " << build_executable_us << "us";
   } else {
     entry->compilation_status =
         BuildExecutable(options, entry->compilation_result, &entry->executable);
@@ -655,7 +664,9 @@ bool XlaCompilationCache::ShouldCompileCluster(CompileMode compile_mode,
                                                int64_t current_request_count,
                                                const NameAttrList& function) {
   LOG(INFO) << "Infer function with name: " << function.name();
-  LOG(INFO) << "compile mode: " << static_cast<std::underlying_type<CompileMode>::type>(compile_mode)
+  LOG(INFO) << "compile mode: "
+            << static_cast<std::underlying_type<CompileMode>::type>(
+                   compile_mode)
             << " is megamorphic: " << is_megamorphic
             << " is first execution: " << is_first_execution
             << " currenct request count: " << current_request_count;
