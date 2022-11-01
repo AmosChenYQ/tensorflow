@@ -604,6 +604,8 @@ def _find_libs(repository_ctx, cuda_config):
       """
     cpu_value = cuda_config.cpu_value
     stub_dir = "" if _is_windows(repository_ctx) else "/stubs"
+     # TODO(amoschenyq): revert this change after resolving cuda version and cudart shared lib SONAME conflict
+    print("Original cuda version is: ", cuda_config.cuda_version, "It will be changed to 11.0")
     return {
         "cuda": _find_cuda_lib(
             "cuda",
@@ -617,14 +619,18 @@ def _find_libs(repository_ctx, cuda_config):
             repository_ctx,
             cpu_value,
             cuda_config.config["cuda_library_dir"],
-            cuda_config.cuda_version,
+            # TODO(amoschenyq): revert this change after resolving cuda version and cudart shared lib SONAME conflict
+            # cuda_config.cuda_version,
+            "11.0"
         ),
         "cudart_static": _find_cuda_lib(
             "cudart_static",
             repository_ctx,
             cpu_value,
             cuda_config.config["cuda_library_dir"],
-            cuda_config.cuda_version,
+            # TODO(amoschenyq): revert this change after resolving cuda version and cudart shared lib SONAME conflict
+            # cuda_config.cuda_version,
+            "11.0",
             static = True,
         ),
         "cublas": _find_cuda_lib(
@@ -646,14 +652,18 @@ def _find_libs(repository_ctx, cuda_config):
             repository_ctx,
             cpu_value,
             cuda_config.config["cuda_library_dir"],
-            cuda_config.cuda_lib_version,
+            # TODO(amoschenyq): revert this change after resolving cuda version and cudart shared lib SONAME conflict
+            # cuda_config.cuda_lib_version,
+            "10"
         ),
         "cufft": _find_cuda_lib(
             "cufft",
             repository_ctx,
             cpu_value,
             cuda_config.config["cuda_library_dir"],
-            cuda_config.cuda_lib_version,
+            # TODO(amoschenyq): revert this change after resolving cuda version and cudart shared lib SONAME conflict
+            # cuda_config.cuda_lib_version,
+            "10"
         ),
         "cudnn": _find_cuda_lib(
             "cudnn",

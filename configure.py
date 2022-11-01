@@ -1348,8 +1348,16 @@ def validate_cuda_config(environ_cp):
     print('Asking for detailed CUDA configuration...\n')
     return False
 
+  line_list = [line for line in proc.stdout]
+
+  # TODO(amoschenyq): delete this debug print
+  print('Below is output from find_cuda_config.py')
+  for line in line_list:
+    print(line.decode('ascii').rstrip().split(': '))
+    
+
   config = dict(
-      tuple(line.decode('ascii').rstrip().split(': ')) for line in proc.stdout)
+      tuple(line.decode('ascii').rstrip().split(': ')) for line in line_list)
 
   print('Found CUDA %s in:' % config['cuda_version'])
   print('    %s' % config['cuda_library_dir'])
@@ -1468,6 +1476,7 @@ def main():
         bazel_config_name='tensorrt')
 
     environ_save = dict(environ_cp)
+
     for _ in range(_DEFAULT_PROMPT_ASK_ATTEMPTS):
 
       if validate_cuda_config(environ_cp):
