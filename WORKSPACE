@@ -10,6 +10,11 @@ load("@//tensorflow:workspace3.bzl", "tf_workspace3")
 
 tf_workspace3()
 
+local_repository(
+    name = "tf_runtime",
+    path = "/home/amoschenyq/hard-disk/runtime"
+)
+
 load("@//tensorflow:workspace2.bzl", "tf_workspace2")
 
 tf_workspace2()

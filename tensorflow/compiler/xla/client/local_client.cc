@@ -413,8 +413,13 @@ LocalClient::CompileAheadOfTime(
     const ExecutableBuildOptions& options) {
   TF_ASSIGN_OR_RETURN(ExecutableBuildOptions updated_options,
                       UpdateBuildOptions(options, default_device_ordinal()));
-  VLOG(1) << "Call local service's CompileAotResults with executable build options: ";
-  VLOG(1) << (updated_options.has_debug_options() ? (updated_options.debug_options().xla_gpu_bef_executable() ? "xla gpu bef executable enabled" : "xla gpu bef executable disabled") : "none debug options");
+  VLOG(1) << "Call local service's CompileAotResults with executable build "
+             "options: ";
+  VLOG(1) << (updated_options.has_debug_options()
+                  ? (updated_options.debug_options().xla_gpu_bef_executable()
+                         ? "xla gpu bef executable enabled"
+                         : "xla gpu bef executable disabled")
+                  : "none debug options");
   TF_ASSIGN_OR_RETURN(
       std::vector<std::unique_ptr<AotCompilationResult>> aot_results,
       local_service_->CompileAotResults(computation, argument_layouts,
@@ -438,8 +443,16 @@ StatusOr<std::unique_ptr<LocalExecutable>> LocalClient::Load(
       std::unique_ptr<xla::AotCompilationResult> aot_result,
       compiler->LoadAotCompilationResult(serialized_aot_result));
 
+  // TODO(amoschenyq): please check out load executable time cost
+  auto load_executable_start = std::chrono::steady_clock::now();
   TF_ASSIGN_OR_RETURN(std::unique_ptr<Executable> executable,
                       aot_result->LoadExecutable(compiler, executor));
+  auto load_executable_end = std::chrono::steady_clock::now();
+  auto load_executable_micro_second =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          load_executable_end - load_executable_start);
+  LOG(WARNING) << "Creating executable from loaded aot results takes "
+               << load_executable_micro_second.count() << "us";
   return absl::make_unique<LocalExecutable>(std::move(executable),
                                             local_service_->mutable_backend(),
                                             updated_options);

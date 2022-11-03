@@ -712,7 +712,8 @@ StatusOr<bool> RunOnInstruction(HloInstruction* conv) {
   TF_RETURN_IF_ERROR(
       custom_call->set_backend_config(GetDefaultBackendConfig()));
 
-  VLOG(1) << "Replacing convolution " << conv->ToString() << " with "
+  // Prevent spamming LOG(INFO)
+  LOG(WARNING) << "Replacing convolution " << conv->ToString() << " with "
           << custom_call->ToString();
 
   // The CustomCall returns a tuple (conv_result, scratch_memory).  Extract
@@ -744,6 +745,8 @@ StatusOr<bool> RunOnComputation(HloComputation* computation) {
 }  // namespace
 
 StatusOr<bool> GpuConvRewriter::Run(HloModule* module) {
+  // Prevent spamming LOG(INFO)
+  LOG(WARNING) << "Run in GpuConvRewriter";
   XLA_VLOG_LINES(2, "GpuConvRewriter::Run(), before:\n" + module->ToString());
   bool changed = false;
   for (HloComputation* computation : module->MakeNonfusionComputations()) {

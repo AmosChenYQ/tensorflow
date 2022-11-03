@@ -1735,7 +1735,8 @@ StatusOr<std::unique_ptr<BufferAssignment>> BufferAssigner::CreateAssignment(
   XLA_VLOG_LINES(3, module->ToString());
   XLA_VLOG_LINES(3, alias_analysis->ToString());
   XLA_VLOG_LINES(3, alias_analysis->dataflow_analysis().ToString());
-  VLOG(1) << "Number of buffers to assign: "
+  // To prevent spamming of VLOG(1)
+  LOG(WARNING) << "Number of buffers to assign: "
           << alias_analysis->buffers().size();
 
   // Can't use absl::make_unique because BufferAssignment constructor is
@@ -1820,6 +1821,7 @@ StatusOr<std::unique_ptr<BufferAssignment>> BufferAssigner::CreateAssignment(
   XLA_VLOG_LINES(2, assignment->ToString());
   TF_RETURN_IF_ERROR(assignment->ComputeSummaryStats());
   XLA_VLOG_LINES(1, assignment->GetStats().ToString());
+  LOG(WARNING) << assignment->GetStats().ToString();
   VLOG(1) << "Buffer assignment done.";
   return std::move(assignment);
 }

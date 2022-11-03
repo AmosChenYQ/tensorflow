@@ -55,30 +55,30 @@ limitations under the License.
 #if XLA_ENABLE_XLIR
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
-#include "mlir/IR/Builders.h"  // from @llvm-project
-#include "mlir/IR/Diagnostics.h"  // from @llvm-project
+#include "mlir/IR/Builders.h"              // from @llvm-project
+#include "mlir/IR/Diagnostics.h"           // from @llvm-project
 #include "tensorflow/compiler/mlir/utils/name_utils.h"
 #include "tensorflow/compiler/xla/service/gpu/jitrt_custom_calls.h"
 #include "tensorflow/compiler/xla/service/gpu/xlir_ops.h"
 #include "tensorflow/stream_executor/gpu/gpu_executor.h"
 #include "tensorflow/stream_executor/gpu/gpu_stream.h"
-#include "tfrt/gpu/gpu_executor.h"  // from @tf_runtime
-#include "tfrt/gpu/gpu_types.h"  // from @tf_runtime
-#include "tfrt/jitrt/jitrt.h"  // from @tf_runtime
-#include "tfrt/jitrt/jitrt_compiler.h"  // from @tf_runtime
-#include "tfrt/bef/bef_buffer.h"  // from @tf_runtime
-#include "tfrt/bef_converter/bef_to_mlir.h"  // from @tf_runtime
-#include "tfrt/bef_executor/bef_file.h"  // from @tf_runtime
-#include "tfrt/core_runtime/core_runtime.h"  // from @tf_runtime
-#include "tfrt/host_context/async_dispatch.h"  // from @tf_runtime
-#include "tfrt/host_context/chain.h"  // from @tf_runtime
+#include "tfrt/bef/bef_buffer.h"                      // from @tf_runtime
+#include "tfrt/bef_converter/bef_to_mlir.h"           // from @tf_runtime
+#include "tfrt/bef_executor/bef_file.h"               // from @tf_runtime
+#include "tfrt/core_runtime/core_runtime.h"           // from @tf_runtime
+#include "tfrt/gpu/gpu_executor.h"                    // from @tf_runtime
+#include "tfrt/gpu/gpu_types.h"                       // from @tf_runtime
+#include "tfrt/host_context/async_dispatch.h"         // from @tf_runtime
+#include "tfrt/host_context/chain.h"                  // from @tf_runtime
 #include "tfrt/host_context/concurrent_work_queue.h"  // from @tf_runtime
-#include "tfrt/host_context/execution_context.h"  // from @tf_runtime
-#include "tfrt/host_context/function.h"  // from @tf_runtime
-#include "tfrt/host_context/host_allocator.h"  // from @tf_runtime
-#include "tfrt/host_context/host_context.h"  // from @tf_runtime
-#include "tfrt/init_tfrt_dialects.h"  // from @tf_runtime
-#endif  // XLA_ENABLE_XLIR
+#include "tfrt/host_context/execution_context.h"      // from @tf_runtime
+#include "tfrt/host_context/function.h"               // from @tf_runtime
+#include "tfrt/host_context/host_allocator.h"         // from @tf_runtime
+#include "tfrt/host_context/host_context.h"           // from @tf_runtime
+#include "tfrt/init_tfrt_dialects.h"                  // from @tf_runtime
+#include "tfrt/jitrt/jitrt.h"                         // from @tf_runtime
+#include "tfrt/jitrt/jitrt_compiler.h"                // from @tf_runtime
+#endif                                                // XLA_ENABLE_XLIR
 
 namespace xla {
 namespace gpu {
@@ -331,6 +331,8 @@ GpuExecutable::GpuExecutable(GpuExecutable::Params params)
     XlaDebugInfoManager::Get()->RegisterModule(
         module().unique_id(), shared_module(), debug_buffer_assignment_);
   }
+  VLOG(1) << "Creating GpuExecutable with detail params for module unique id: "
+          << module().unique_id();
 }
 
 GpuExecutable::GpuExecutable(
@@ -352,6 +354,8 @@ GpuExecutable::GpuExecutable(
     XlaDebugInfoManager::Get()->RegisterModule(
         module().unique_id(), shared_module(), debug_buffer_assignment_);
   }
+  VLOG(1) << "Creating GpuExecutable with hlo module for module unique id: "
+          << module().unique_id();
 }
 
 GpuExecutable::~GpuExecutable() {
@@ -1308,8 +1312,11 @@ GpuExecutable::CreatePreloadedGpuContextCache(llvm::ArrayRef<uint8_t> bef_array,
       tfrt::BEFFile::Open(bef_array, host_ctx->GetKernelRegistry(),
                           host_ctx->diag_handler(), host_ctx->allocator());
   if (!bef_file) {
+    LOG(WARNING) << "Failed to decode BEF buffer";
     return InternalError("Failed to decode BEF buffer");
   }
+
+  LOG(WARNING) << "Successfully decode BEF buffer";
 
   auto gpu_executor =
       tensorflow::down_cast<se::gpu::GpuExecutor*>(executor->implementation());
@@ -1317,13 +1324,20 @@ GpuExecutable::CreatePreloadedGpuContextCache(llvm::ArrayRef<uint8_t> bef_array,
       se::gpu::GpuDriver::GetContextHandle(gpu_executor->gpu_context());
 
   auto gpu_ctx_cache = OwnedGpuContextCache(new tfrt::gpu::GpuContextCache);
+
+  LOG(WARNING)
+      << "Successfully create gpu executor and context and context cache";
+
   auto context_and_resource = gpu_ctx_cache->GetOrCreate(gpu_context);
   auto exec_ctx = tfrt::gpu::CreateExecutionContext(
       host_ctx.get(), context_and_resource.second);
 
   if (auto error = tfrt::gpu::PreloadGpuResources(
           *bef_file, *exec_ctx, context_and_resource.first.CopyRef())) {
-    return tensorflow::errors::Internal(llvm::toString(std::move(error)));
+    auto error_in_string = llvm::toString(std::move(error));
+    LOG(WARNING) << "Preload gpu resources but failed with error: "
+                 << error_in_string;
+    return tensorflow::errors::Internal(error_in_string);
   }
   return gpu_ctx_cache;
 #else   // XLA_ENABLE_XLIR

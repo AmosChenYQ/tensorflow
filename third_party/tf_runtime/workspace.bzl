@@ -1,6 +1,7 @@
 """Provides the repository macro to import TFRT."""
 
 load("//third_party:repo.bzl", "tf_http_archive", "tf_mirror_urls")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def repo():
     """Imports TFRT."""
@@ -9,12 +10,27 @@ def repo():
     TFRT_COMMIT = "527789bef0f0f386fcdbd929d3e1e4244d4861ce"
     TFRT_SHA256 = "b941926730becd4b8c774b13fdc3e1b9c49994758425af27a4f109674e4a0d12"
 
-    tf_http_archive(
-        name = "tf_runtime",
-        sha256 = TFRT_SHA256,
-        strip_prefix = "runtime-{commit}".format(commit = TFRT_COMMIT),
-        urls = tf_mirror_urls("https://github.com/tensorflow/runtime/archive/{commit}.tar.gz".format(commit = TFRT_COMMIT)),
-        # A patch file can be provided for atomic commits to both TF and TFRT.
-        # The job that bumps the TFRT_COMMIT also resets patch_file to 'None'.
-        patch_file = None,
-    )
+    # tf_http_archive(
+    #     name = "tf_runtime",
+    #     sha256 = TFRT_SHA256,
+    #     strip_prefix = "runtime-{commit}".format(commit = TFRT_COMMIT),
+    #     urls = tf_mirror_urls("https://github.com/tensorflow/runtime/archive/{commit}.tar.gz".format(commit = TFRT_COMMIT)),
+    #     # A patch file can be provided for atomic commits to both TF and TFRT.
+    #     # The job that bumps the TFRT_COMMIT also resets patch_file to 'None'.
+    #     patch_file = None,
+    # )
+
+    # http_archive(
+    #     name = "tf_runtime",
+    #     sha256 = TFRT_SHA256,
+    #     strip_prefix = "runtime-{commit}".format(commit = TFRT_COMMIT),
+    #     urls = tf_mirror_urls("https://github.com/amoschenyq/runtime/archive/{commit}.tar.gz".format(commit = TFRT_COMMIT)),
+    #     # A patch file can be provided for atomic commits to both TF and TFRT.
+    #     # The job that bumps the TFRT_COMMIT also resets patch_file to 'None'.
+    #     patch_file = None,
+    # )
+
+    # local_repository(
+    #     name = "tf_runtime",
+    #     path = "/home/amoschenyq/hard-disk/runtime"
+    # )

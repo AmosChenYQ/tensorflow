@@ -37,15 +37,15 @@ limitations under the License.
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Transforms/Utils/SplitModule.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"  // from @llvm-project
-#include "mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
-#include "mlir/Dialect/GPU/Passes.h"  // from @llvm-project
-#include "mlir/IR/BuiltinOps.h"  // from @llvm-project
-#include "mlir/InitAllDialects.h"  // from @llvm-project
-#include "mlir/Pass/PassManager.h"  // from @llvm-project
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"       // from @llvm-project
+#include "mlir/Dialect/Func/IR/FuncOps.h"                // from @llvm-project
+#include "mlir/Dialect/GPU/Passes.h"                     // from @llvm-project
+#include "mlir/IR/BuiltinOps.h"                          // from @llvm-project
+#include "mlir/InitAllDialects.h"                        // from @llvm-project
+#include "mlir/Pass/PassManager.h"                       // from @llvm-project
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"  // from @llvm-project
-#include "mlir/Transforms/LocationSnapshot.h"  // from @llvm-project
-#include "mlir/Transforms/Passes.h"  // from @llvm-project
+#include "mlir/Transforms/LocationSnapshot.h"            // from @llvm-project
+#include "mlir/Transforms/Passes.h"                      // from @llvm-project
 #include "tensorflow/compiler/mlir/utils/name_utils.h"
 #include "tensorflow/compiler/mlir/xla/hlo_utils.h"
 #include "tensorflow/compiler/mlir/xla/type_to_shape.h"
@@ -179,10 +179,10 @@ limitations under the License.
 
 #if XLA_ENABLE_XLIR
 #include "tensorflow/compiler/mlir/tfrt/transforms/lmhlo_to_gpu/pass_utils.h"
-#include "tfrt/gpu/gpu_executor.h"  // from @tf_runtime
-#include "tfrt/bef/bef_buffer.h"  // from @tf_runtime
+#include "tfrt/bef/bef_buffer.h"                       // from @tf_runtime
 #include "tfrt/bef_converter/mlir_to_bef_translate.h"  // from @tf_runtime
-#endif  // XLA_ENABLE_XLIR
+#include "tfrt/gpu/gpu_executor.h"                     // from @tf_runtime
+#endif                                                 // XLA_ENABLE_XLIR
 
 namespace xla {
 namespace gpu {
@@ -815,7 +815,14 @@ StatusOr<std::unique_ptr<HloModule>> GpuCompiler::RunHloPasses(
   TF_RETURN_IF_ERROR(
       OptimizeHloModule(module.get(), stream_exec, options.device_allocator));
 
+  // Prevent spamming LOG(INFO)
+  LOG(WARNING) << "Successfully optimize hlo module " << module->name();
+
   TF_RETURN_IF_ERROR(PrepareHloModuleForIrEmitting(module.get()));
+
+  // Prevent spamming LOG(INFO)
+  LOG(WARNING) << "Successfully prepare hlo module for ir emitting "
+               << module->name();
 
   uint64_t end_usecs = tensorflow::Env::Default()->NowMicros();
 
@@ -997,6 +1004,10 @@ static Status CompileModuleToLlvmIrImpl(
       std::unique_ptr<GpuHloSchedule> hlo_schedule,
       GpuHloSchedule::Build(hlo_module, *stream_assignment, pointer_size));
 
+  // LOG(WARNING) to prevent spamming LOG(INFO)
+  LOG(WARNING) << "Successfully build gpu hlo schedule for hlo module "
+               << hlo_module->name();
+
   auto buffer_size_bytes_function =
       [pointer_size](const BufferValue& buffer_value) -> int64_t {
     return GetSizeOfShape(buffer_value.shape(), pointer_size);
@@ -1013,8 +1024,9 @@ static Status CompileModuleToLlvmIrImpl(
           /*colorer=*/BufferAssigner::DefaultColorer(),
           /*must_not_live_out=*/{}, can_share_buffer_function));
 
-  VLOG(1) << "Buffer Assignment Stats for " << hlo_module->name() << "\n"
-          << results->buffer_assignment->GetStats().ToString();
+  // LOG(WARNING) to prevent spamming LOG(INFO)
+  LOG(WARNING) << "Buffer Assignment Stats for " << hlo_module->name() << "\n"
+               << results->buffer_assignment->GetStats().ToString();
   DumpHloModuleIfEnabled(*hlo_module, *results->buffer_assignment,
                          absl::StrCat("sm_", cuda_compute_capability.ToString(),
                                       "_gpu_after_optimizations"));
@@ -1030,6 +1042,8 @@ static Status CompileModuleToLlvmIrImpl(
 
   TF_RETURN_IF_ERROR(
       HloToLhloModule(*results->buffer_assignment, *hlo_module, *mlir_module));
+
+  LOG(WARNING) << "Converting hlo to lhlo for hlo module: " << hlo_module->name();
 
   results->module_name = mlir::GetNameFromLoc(mlir_module->getLoc());
 
@@ -1078,11 +1092,14 @@ static Status CompileModuleToLlvmIrImpl(
     // This won't record values for calls that error out (because if they error
     // out we have no way of telling how far through the process we got).
     RecordHloToLlvmDuration(end_usecs - start_usecs);
+
+    LOG(WARNING) << "Emit Lmhlo for hlo module: " << hlo_module->name() << "\n";
   }
 
 #if XLA_ENABLE_XLIR
   if (IsBefExecutableEnabled(hlo_module->config())) {
-    LOG(INFO) << "BefExecutable is enabled";
+    // Use LOG(WARNING) here to prevent spamming of LOG(INFO)
+    LOG(WARNING) << "BefExecutable is enabled";
     std::vector<int64_t> buffer_sizes;
     llvm::transform(
         results->allocations, std::back_inserter(buffer_sizes),
@@ -1090,6 +1107,8 @@ static Status CompileModuleToLlvmIrImpl(
     TF_ASSIGN_OR_RETURN(results->executable,
                         LowerToBef(*mlir_module, entry_function.getName(),
                                    buffer_sizes, hlo_module));
+    // Use LOG(WARNING) here to prevent spamming of LOG(INFO)
+    LOG(WARNING) << "BefExecutable is created";
     if (stream_exec) {
       auto& bef_buffer = absl::get<OwnedBefBuffer>(results->executable);
       llvm::ArrayRef<uint8_t> bef_array(bef_buffer.get(),
@@ -1097,6 +1116,8 @@ static Status CompileModuleToLlvmIrImpl(
       TF_ASSIGN_OR_RETURN(results->gpu_ctx_cache,
                           GpuExecutable::CreatePreloadedGpuContextCache(
                               bef_array, stream_exec));
+      // Use LOG(WARNING) here to prevent spamming of LOG(INFO)
+      LOG(WARNING) << "GPU contenxt with cache is created";
     }
     return ::tensorflow::OkStatus();
   }
@@ -1350,9 +1371,10 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
         stream_exec->GetDeviceDescription().memory_bandwidth());
     GpuHloCostAnalysis cost_analysis(options);
     TF_RETURN_IF_ERROR(module->entry_computation()->Accept(&cost_analysis));
-    VLOG(1) << "HLO memory read+written: "
-            << tensorflow::strings::HumanReadableNumBytes(
-                   cost_analysis.bytes_accessed());
+    // Change VLOG(1) to LOG(WARNING) filtering spamming LOG(INFO)
+    LOG(WARNING) << "HLO memory read+written: "
+                 << tensorflow::strings::HumanReadableNumBytes(
+                        cost_analysis.bytes_accessed());
     if (module->config().hlo_profiling_enabled()) {
       LOG(ERROR) << "--xla_hlo_profile for GPU is unsupported.";
     }
@@ -1368,8 +1390,15 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
       GetCanShareBuffer(), pointer_size_, &compile_module_results,
       stream_exec));
 
+  // LOG(WARNING) to prevent spamming LOG(INFO)
+  LOG(WARNING) << "Successfully compile module to LLVM ir for hlo module "
+               << module->name();
+
   if (user_pre_optimization_hook_) {
     user_pre_optimization_hook_(*compile_module_results.llvm_module);
+    // LOG(WARNING) to prevent spamming LOG(INFO)
+    LOG(WARNING) << "Successfully apply pre optimization hook to llvm module"
+                 << compile_module_results.module_name;
   }
   std::string ir_module_string_before_opt;
   const bool embed_ir_in_executable =
@@ -1388,6 +1417,12 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
       CompileToTargetBinary(module->config(),
                             std::move(compile_module_results.llvm_module),
                             stream_exec, options, module.get()));
+
+  // LOG(WARNING) to prevent spamming LOG(INFO)
+  LOG(WARNING)
+      << "Successfully compile llvm module to target binary for hlo module "
+      << module->name();
+
   if (DumpingEnabledForHloModule(*module) &&
       absl::holds_alternative<OwnedThunkSchedule>(
           compile_module_results.executable)) {
@@ -1397,12 +1432,23 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
                             thunk_schedule.ToString());
   }
 
+  // LOG(WARNING) to prevent spamming LOG(INFO)
+  LOG(INFO) << "Executable is in thunk schedule format: "
+            << (absl::holds_alternative<OwnedThunkSchedule>(
+                    compile_module_results.executable)
+                    ? "Yes"
+                    : "No");
+
   auto buffer_assignment_proto = std::make_unique<BufferAssignmentProto>(
       compile_module_results.buffer_assignment->ToProto());
 
   // Make it shared to be captured in the following lambda.
   std::shared_ptr<const BufferAssignment> buffer_assignment(
       std::move(compile_module_results.buffer_assignment));
+
+  // LOG(WARNING) to prevent spamming LOG(INFO)
+  LOG(WARNING) << "Successfully assign buffer for compile module results: "
+               << compile_module_results.module_name;
 
   GpuVersion gpu_version = GetGpuVersion(stream_exec);
   TF_ASSIGN_OR_RETURN(
@@ -1445,9 +1491,16 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
 StatusOr<std::unique_ptr<AotCompilationResult>>
 GpuCompiler::LoadAotCompilationResult(
     const std::string& serialized_aot_result) {
+  typedef std::uint64_t uint64;
+  tensorflow::Env* env = tensorflow::Env::Default();
+  const uint64 parse_cost_start_us = env->NowMicros();
   TF_ASSIGN_OR_RETURN(
       std::unique_ptr<AotCompilationResult> aot_result,
       GpuAotCompilationResult::FromString(serialized_aot_result));
+  const uint64 parse_cost_end_us = env->NowMicros();
+  const uint64 parse_cost_us = parse_cost_end_us - parse_cost_start_us;
+  LOG(WARNING) << "Loading ahead of time string results takes " << parse_cost_us
+               << "us";
   return aot_result;
 }
 
@@ -1484,7 +1537,8 @@ GpuCompiler::CompileAheadOfTime(std::unique_ptr<HloModuleGroup> module_group,
   std::vector<std::unique_ptr<AotCompilationResult>> results;
 
   for (const auto& module : modules) {
-    LOG(INFO) << "Compiling on HloModule with compilation cache key: " << module->config().compilation_cache_key();
+    LOG(INFO) << "Compiling on HloModule with compilation cache key: "
+              << module->config().compilation_cache_key();
 
     XLA_SCOPED_LOGGING_TIMER(
         "GpuCompiler::CompileAheadOfTime - compiling one HloModule");

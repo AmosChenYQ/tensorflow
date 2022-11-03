@@ -291,7 +291,10 @@ Status XlaCompilationCache::BuildExecutable(
       auto executables,
       client_->Compile(*result.computation, argument_layouts, build_options));
   TF_RET_CHECK(executables.size() == 1);
+  // Set LOG(WARNING) to filter spamming LOG(INFO)
+  LOG(WARNING) << "Executables' size of local client compilation result is " << executables.size();
   *executable = std::move(executables[0]);
+  LOG(WARNING) << "Executable is nullptr: " << ((!(*executable)) ? "true" : "false");
   return OkStatus();
 }
 
@@ -318,7 +321,7 @@ XlaCompilationCache::LoadExecutable(
     const XlaCompiler::Options& options,
     const XlaCompiler::CompilationResult& result,
     const std::string& serialized_aot_result) {
-  VLOG(2) << "Loading local executable using BEF.";
+  LOG(INFO) << "Loading local executable using BEF.";
 
   xla::ExecutableBuildOptions build_options =
       GetBuildOptions(options, result, client_->default_device_ordinal());
@@ -537,14 +540,18 @@ Status XlaCompilationCache::CompileStrict(
     }
 
     if (serialized_entry.has_value()) {
+      const uint64 verification_start_us = env->NowMicros();
       TF_RETURN_IF_ERROR(
           VerifyLoadedCacheEntry(cache_key, hlo_module, *serialized_entry));
+      const uint64 verification_end_us = env->NowMicros();
+      const uint64 verification_cost_us =
+          verification_end_us - verification_start_us;
+      LOG(WARNING) << "Verifying loaded cache entry takes "
+                   << verification_cost_us << "us";
     }
   }
 
   if (serialized_entry.has_value()) {
-    VLOG(1) << "Loading cached entry & build executable for: "
-            << sig.HumanString();
     const uint64 build_executable_start_us = env->NowMicros();
     StatusOr<std::unique_ptr<xla::LocalExecutable>> executable = LoadExecutable(
         options, entry->compilation_result, serialized_entry->executable());
@@ -555,8 +562,9 @@ Status XlaCompilationCache::CompileStrict(
     const uint64 build_executable_end_us = env->NowMicros();
     const uint64 build_executable_us =
         build_executable_end_us - build_executable_start_us;
-    VLOG(1) << "Loading cached entry & build executable for: "
-            << sig.HumanString() << " takes " << build_executable_us << "us";
+    LOG(WARNING) << "Totally building executable from cached entry for: "
+                 << sig.HumanString() << " takes " << build_executable_us
+                 << "us";
   } else {
     entry->compilation_status =
         BuildExecutable(options, entry->compilation_result, &entry->executable);
@@ -949,9 +957,17 @@ XlaCompilationCache::TryLoadSerializedEntry(const XlaSerializedCacheKey& key) {
     return StatusOr<absl::optional<XlaSerializedCacheEntry>>(absl::nullopt);
   }
 
+  // TODO(amoschenyq): check if read both text and binary format is needed
   VLOG(1) << "Read XlaSerializedCacheEntry from " << file_path;
   XlaSerializedCacheEntry entry;
+  typedef std::uint64_t uint64;
+  const uint64 read_proto_cost_start_us = env->NowMicros();
   TF_RETURN_IF_ERROR(ReadTextOrBinaryProto(env, file_path, &entry));
+  const uint64 read_proto_cost_end_us = env->NowMicros();
+  const uint64 read_proto_cost_us =
+      read_proto_cost_end_us - read_proto_cost_start_us;
+  LOG(WARNING) << "Reading XlaSerializedCacheEntry from proto takes "
+               << read_proto_cost_us << "us";
   return StatusOr<absl::optional<XlaSerializedCacheEntry>>(entry);
 }
 

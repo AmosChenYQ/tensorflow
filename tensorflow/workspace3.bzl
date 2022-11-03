@@ -15,7 +15,7 @@ def workspace():
         ],
     )
 
-    tf_runtime()
+    # tf_runtime()
 
     # https://github.com/bazelbuild/bazel-skylib/releases
     http_archive(

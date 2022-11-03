@@ -774,6 +774,8 @@ void VlogStats(HloModule* module) {
 }  // namespace
 
 StatusOr<bool> CudnnFusedConvRewriter::Run(HloModule* module) {
+  // Prevent spamming LOG(INFO)
+  LOG(WARNING) << "Run in CudnnFusedConvRewriter";
   bool any_changed = false;
 
   for (HloComputation* comp : module->MakeNonfusionComputations()) {

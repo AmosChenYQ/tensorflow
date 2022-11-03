@@ -1674,6 +1674,10 @@ Status HloToLhloModule(const BufferAssignment& assignment,
 
   const std::vector<HloInstruction*>& ordering = schedule->instructions();
   TF_RETURN_IF_ERROR(computation->AcceptOrdered(&emitter, ordering));
+
+  // TODO(amoschenyq) without introducing logging component of tensorflow, to be removed
+  std::cout << "AmosChenYQ std log: " << __FILE__ << ":" << __LINE__ << " " << "Using LhloDialectEmitter to generate Lhlo module" << std::endl;
+
   TF_RETURN_IF_ERROR(status_handler.ConsumeStatus());
 
   (void)mlir::verify(module);

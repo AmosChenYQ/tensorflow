@@ -142,6 +142,7 @@ bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
       bytes = RoundedBytes(bytes * kBackpedalFactor);
       if (bytes < rounded_bytes) break;
       mem_addr = sub_allocator_->Alloc(alignment, bytes, &bytes_received);
+      // VLOG(1) << "Trying to allocate memory with shrunk space.";
     }
   }
 
@@ -412,6 +413,10 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
                                         size_t num_bytes,
                                         bool dump_log_on_failure,
                                         uint64 freed_before) {
+  // MemoryDump memory_dump = RecordMemoryMap();
+  // LOG(WARNING) << "Before allocating " << strings::HumanReadableNumBytes(num_bytes) <<", there is "
+  //              << strings::HumanReadableNumBytes(memory_dump.stats().bytes_in_use())
+  //              << " in use";
   if (num_bytes == 0) {
     VLOG(2) << "tried to allocate 0 bytes";
     return nullptr;
@@ -680,6 +685,10 @@ void BFCAllocator::DeallocateRaw(void* ptr) {
           << (ptr ? RequestedSize(ptr) : 0);
   DeallocateRawInternal(ptr);
   retry_helper_.NotifyDealloc();
+  // MemoryDump memory_dump = RecordMemoryMap();
+  // LOG(WARNING) << "After deallocating " << Name() << " "
+  //              << strings::HumanReadableNumBytes(memory_dump.stats().bytes_in_use())
+  //              << " in use";
 }
 
 void BFCAllocator::DeallocateRawInternal(void* ptr) {
